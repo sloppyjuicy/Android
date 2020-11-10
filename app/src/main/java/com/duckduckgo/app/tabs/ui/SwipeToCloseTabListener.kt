@@ -28,10 +28,14 @@ class SwipeToCloseTabListener(
     private val numberGridColumns: Int,
     private val tabSwipedListener: OnTabSwipedListener
 ) :
-    ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT) {
+    ItemTouchHelper.SimpleCallback(
+        ItemTouchHelper.START or ItemTouchHelper.END or ItemTouchHelper.UP or ItemTouchHelper.DOWN,
+        ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT
+    ) {
 
     interface OnTabSwipedListener {
         fun onSwiped(tab: TabEntity)
+        fun onSwapTabs(fromTabEntity: TabEntity, toTabEntity: TabEntity)
     }
 
     override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
@@ -55,8 +59,26 @@ class SwipeToCloseTabListener(
         super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
     }
 
-    override fun onMove(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean {
-        return false
+    override fun onSelectedChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
+        super.onSelectedChanged(viewHolder, actionState)
+
+        if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
+            viewHolder?.itemView?.alpha = 0.7f
+        }
     }
 
+    override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+        super.clearView(recyclerView, viewHolder)
+        viewHolder.itemView.alpha = 1f
+    }
+
+    override fun onMove(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean {
+        val from = viewHolder.adapterPosition
+        val to = target.adapterPosition
+
+        if (from >= 0 && to >= 0) {
+            tabSwipedListener.onSwapTabs(tabSwitcherAdapter.getTab(from), tabSwitcherAdapter.getTab(to))
+        }
+        return false
+    }
 }

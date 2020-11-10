@@ -72,6 +72,10 @@ class TabSwitcherViewModel(private val tabRepository: TabRepository, private val
         tabRepository.purgeDeletableTabs()
     }
 
+    suspend fun swapTabs(fromTabId: String, toTabId: String) {
+        tabRepository.swapTabsPositions(fromTabId, toTabId)
+    }
+
     fun onClearComplete() {
         command.value = Command.DisplayMessage(R.string.fireDataCleared)
         command.value = Command.Close

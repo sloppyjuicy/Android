@@ -178,6 +178,12 @@ class TabDataRepository @Inject constructor(
         }
     }
 
+    override suspend fun swapTabsPositions(fromTabId: String, toTabId: String) {
+        databaseExecutor().scheduleDirect {
+            tabsDao.swapTabs(fromTabId, toTabId)
+        }
+    }
+
     override suspend fun update(tabId: String, site: Site?) {
         databaseExecutor().scheduleDirect {
             tabsDao.updateUrlAndTitle(tabId, site?.url, site?.title, viewed = true)

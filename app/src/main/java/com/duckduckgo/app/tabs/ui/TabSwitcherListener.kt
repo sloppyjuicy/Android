@@ -22,4 +22,5 @@ interface TabSwitcherListener {
     fun onNewTabRequested()
     fun onTabSelected(tab: TabEntity)
     fun onTabDeleted(tab: TabEntity)
+    fun onSwapTabs(fromTabEntity: TabEntity, toTabEntity: TabEntity)
 }

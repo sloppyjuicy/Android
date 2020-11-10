@@ -106,6 +106,23 @@ abstract class TabsDao {
     @Query("update tabs set position = position + 1 where position >= :position")
     abstract fun incrementPositionStartingAt(position: Int)
 
+    @Query("select * from tabs where position = :position limit 1")
+    abstract fun tabAtPosition(position: Int): TabEntity?
+
+    @Query("select * from tabs where position >= :position order by position limit 1")
+    abstract fun firstTabStartingAtPosition(position: Int): TabEntity?
+
+    @Transaction
+    open fun swapTabs(fromTabId: String, toTabId: String) {
+        val fromTab = tab(fromTabId) ?: return
+        val toTab = tab(toTabId) ?: return
+        val from = fromTab.position
+        fromTab.position = toTab.position
+        toTab.position = from
+        updateTab(fromTab)
+        updateTab(toTab)
+    }
+
     @Transaction
     open fun addAndSelectTab(tab: TabEntity) {
         deleteBlankTabs()

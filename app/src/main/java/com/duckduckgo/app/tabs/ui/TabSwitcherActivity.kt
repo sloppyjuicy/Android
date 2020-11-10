@@ -124,6 +124,10 @@ class TabSwitcherActivity : DuckDuckGoActivity(), TabSwitcherListener, Coroutine
                     override fun onSwiped(tab: TabEntity) {
                         onTabDeleted(tab)
                     }
+
+                    override fun onSwapTabs(fromTabEntity: TabEntity, toTabEntity: TabEntity) {
+                        this@TabSwitcherActivity.onSwapTabs(fromTabEntity, toTabEntity)
+                    }
                 }
             )
         )
@@ -251,6 +255,10 @@ class TabSwitcherActivity : DuckDuckGoActivity(), TabSwitcherListener, Coroutine
             })
             .apply { view.findViewById<TextView>(com.google.android.material.R.id.snackbar_text).maxLines = 1 }
             .show()
+    }
+
+    override fun onSwapTabs(fromTabEntity: TabEntity, toTabEntity: TabEntity) {
+        launch { viewModel.swapTabs(fromTabEntity.tabId, toTabEntity.tabId) }
     }
 
     private fun closeAllTabs() {
