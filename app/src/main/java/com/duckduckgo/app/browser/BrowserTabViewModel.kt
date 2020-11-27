@@ -1367,7 +1367,7 @@ class BrowserTabViewModel(
 
     suspend fun editBookmark(id: Long, title: String, url: String) {
         withContext(dispatchers.io()) {
-            bookmarksDao.update(BookmarkEntity(id, title, url))
+            bookmarksDao.updateKeepPosition(BookmarkEntity(id, title, url))
         }
     }
 

@@ -26,7 +26,7 @@ interface BookmarksDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(bookmark: BookmarkEntity): Long
 
-    @Query("select * from bookmarks")
+    @Query("select * from bookmarks order by position")
     fun bookmarks(): LiveData<List<BookmarkEntity>>
 
     @Query("select count(*) from bookmarks WHERE url LIKE :url")
@@ -34,6 +34,18 @@ interface BookmarksDao {
 
     @Delete
     fun delete(bookmark: BookmarkEntity)
+
+    @Deprecated(
+        message = "Don't use method as it does not update the position",
+        replaceWith = ReplaceWith(expression = "update", imports = ["com.duckduckgo.app.bookmarks"])
+    )
+    @Transaction
+    fun updateKeepPosition(bookmarkEntity: BookmarkEntity) {
+        val bookmark = bookmark(bookmarkEntity.id)
+        bookmark?.let {
+            update(bookmarkEntity.copy(position = it.position))
+        }
+    }
 
     @Update(onConflict = OnConflictStrategy.REPLACE)
     fun update(bookmarkEntity: BookmarkEntity)
@@ -43,4 +55,18 @@ interface BookmarksDao {
 
     @Query("select CAST(COUNT(*) AS BIT) from bookmarks")
     suspend fun hasBookmarks(): Boolean
+
+    @Query("select * from bookmarks where id = :id")
+    fun bookmark(id: Long): BookmarkEntity?
+
+    @Transaction
+    suspend fun swapBookmarks(fromId: Long, toId: Long) {
+        val fromBookmark = bookmark(fromId) ?: return
+        val toBookmark = bookmark(toId) ?: return
+        val from = fromBookmark.position
+        fromBookmark.position = toBookmark.position
+        toBookmark.position = from
+        update(fromBookmark)
+        update(toBookmark)
+    }
 }

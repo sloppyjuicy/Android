@@ -498,7 +498,7 @@ class BrowserTabViewModelTest {
     @Test
     fun whenBookmarkEditedThenDaoIsUpdated() = coroutineRule.runBlocking {
         testee.editBookmark(0, "A title", "www.example.com")
-        verify(mockBookmarksDao).update(BookmarkEntity(title = "A title", url = "www.example.com"))
+        verify(mockBookmarksDao).updateKeepPosition(BookmarkEntity(title = "A title", url = "www.example.com"))
     }
 
     @Test

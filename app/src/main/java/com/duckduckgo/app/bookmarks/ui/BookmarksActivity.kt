@@ -30,7 +30,9 @@ import androidx.appcompat.widget.SearchView
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.RecyclerView.Adapter
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import com.duckduckgo.app.bookmarks.db.BookmarkEntity
 import com.duckduckgo.app.browser.BrowserActivity
@@ -54,11 +56,18 @@ import kotlinx.android.synthetic.main.view_bookmark_entry.view.favicon
 import kotlinx.android.synthetic.main.view_bookmark_entry.view.overflowMenu
 import kotlinx.android.synthetic.main.view_bookmark_entry.view.title
 import kotlinx.android.synthetic.main.view_bookmark_entry.view.url
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.coroutines.CoroutineContext
 
-class BookmarksActivity : DuckDuckGoActivity() {
+class BookmarksActivity : DuckDuckGoActivity(), CoroutineScope {
+
+    override val coroutineContext: CoroutineContext
+        get() = SupervisorJob() + Dispatchers.Main
 
     @Inject
     lateinit var faviconManager: FaviconManager
@@ -79,6 +88,22 @@ class BookmarksActivity : DuckDuckGoActivity() {
     private fun setupBookmarksRecycler() {
         adapter = BookmarksAdapter(layoutInflater, viewModel, this, faviconManager)
         recycler.adapter = adapter
+        ItemTouchHelper(
+            BookmarkItemDragTouchListener(
+                adapter,
+                object : BookmarkItemDragTouchListener.BookmarkSwapListener {
+                    override fun onSwapBookmarks(fromBookmarkEntity: BookmarkEntity, toBookmarkEntity: BookmarkEntity) {
+                        this@BookmarksActivity.swapBookmarkItems(fromBookmarkEntity, toBookmarkEntity)
+                    }
+                }
+            )
+        ).apply {
+            attachToRecyclerView(recycler)
+        }
+    }
+
+    private fun swapBookmarkItems(fromBookmarkEntity: BookmarkEntity, toBookmarkEntity: BookmarkEntity) = launch {
+        viewModel.swapBookmarks(fromBookmarkEntity, toBookmarkEntity)
     }
 
     private fun observeViewModel() {
@@ -175,12 +200,12 @@ class BookmarksActivity : DuckDuckGoActivity() {
         private val viewModel: BookmarksViewModel,
         private val lifecycleOwner: LifecycleOwner,
         private val faviconManager: FaviconManager
-    ) : Adapter<BookmarksViewHolder>() {
+    ) : ListAdapter<BookmarkEntity, BookmarksViewHolder>(BookmarkEntityDiffCallback()) {
 
-        var bookmarks: List<BookmarkEntity> = emptyList()
+        var bookmarks: List<BookmarkEntity>
+            get() = currentList
             set(value) {
-                field = value
-                notifyDataSetChanged()
+                submitList(value)
             }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): BookmarksViewHolder {
@@ -193,9 +218,33 @@ class BookmarksActivity : DuckDuckGoActivity() {
             holder.update(bookmarks[position])
         }
 
-        override fun getItemCount(): Int {
-            return bookmarks.size
+        fun getBookmark(position: Int): BookmarkEntity = getItem(position)
+    }
+
+    class BookmarkEntityDiffCallback : DiffUtil.ItemCallback<BookmarkEntity>() {
+        override fun areItemsTheSame(oldItem: BookmarkEntity, newItem: BookmarkEntity): Boolean {
+            return oldItem.id == newItem.id
         }
+
+        override fun areContentsTheSame(oldItem: BookmarkEntity, newItem: BookmarkEntity): Boolean {
+            return oldItem.title == newItem.title && oldItem.url == newItem.url
+        }
+
+//        override fun getChangePayload(oldItem: BookmarkEntity, newItem: BookmarkEntity): Any? {
+//            val diffBundle = Bundle()
+//
+//            if (oldItem.url != newItem.url) {
+//                diffBundle.putString("url", newItem.url)
+//            }
+//            if (oldItem.title != newItem.title) {
+//                diffBundle.putString("title", newItem.title)
+//            }
+//            if (oldItem.id != newItem.id) {
+//                diffBundle.putLong("id", newItem.id)
+//            }
+//
+//            return diffBundle
+//        }
     }
 
     class BookmarksViewHolder(

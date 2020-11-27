@@ -28,10 +28,12 @@ import com.duckduckgo.app.global.plugins.view_model.ViewModelFactoryPlugin
 import com.duckduckgo.di.scopes.AppObjectGraph
 import com.squareup.anvil.annotations.ContributesMultibinding
 import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Provider
+import kotlinx.coroutines.withContext
 
 class BookmarksViewModel(
     val dao: BookmarksDao,
@@ -75,7 +77,7 @@ class BookmarksViewModel(
 
     override fun onBookmarkEdited(id: Long, title: String, url: String) {
         Schedulers.io().scheduleDirect {
-            dao.update(BookmarkEntity(id, title, url))
+            dao.updateKeepPosition(BookmarkEntity(id, title, url))
         }
     }
 
@@ -112,6 +114,9 @@ class BookmarksViewModel(
         }
     }
 
+    suspend fun swapBookmarks(fromBookmarkEntity: BookmarkEntity, toBookmarkEntity: BookmarkEntity) = withContext(Dispatchers.IO) {
+        dao.swapBookmarks(fromBookmarkEntity.id, toBookmarkEntity.id)
+    }
 }
 
 @ContributesMultibinding(AppObjectGraph::class)

@@ -30,5 +30,6 @@ import androidx.room.PrimaryKey
 data class BookmarkEntity(
     @PrimaryKey(autoGenerate = true) var id: Long = 0,
     var title: String?,
-    var url: String
+    var url: String,
+    var position: Long = 0
 )

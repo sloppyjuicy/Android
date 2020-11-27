@@ -403,6 +403,13 @@ class MigrationsProvider(
         }
     }
 
+    val MIGRATION_31_TO_32: Migration = object : Migration(28, 29) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("ALTER TABLE `bookmarks` ADD COLUMN `position` INTEGER NOT NULL DEFAULT 0")
+            database.execSQL("UPDATE `bookmarks` SET `position` = `id`")
+        }
+    }
+
     val CHANGE_JOURNAL_ON_OPEN = object : RoomDatabase.Callback() {
         override fun onOpen(db: SupportSQLiteDatabase) {
             db.query("PRAGMA journal_mode=DELETE;").use { cursor -> cursor.moveToFirst() }
@@ -440,7 +447,8 @@ class MigrationsProvider(
             MIGRATION_27_TO_28,
             MIGRATION_28_TO_29,
             MIGRATION_29_TO_30,
-            MIGRATION_30_TO_31
+            MIGRATION_30_TO_31,
+            MIGRATION_31_TO_32
         )
 
     @Deprecated(
