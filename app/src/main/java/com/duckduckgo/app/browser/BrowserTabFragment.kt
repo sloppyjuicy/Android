@@ -1430,11 +1430,12 @@ class BrowserTabFragment :
             fireMenuButton?.isVisible = viewState.fireButton is FireButton.Visible
             menuButton?.isVisible = viewState.showMenuButton
 
+            // omnibar only scrollable when browser showing and the fire button is not promoted
             if (viewState.fireButton.playPulseAnimation()) {
                 omnibarScrolling.disableOmnibarScrolling(toolbarContainer)
                 playPulseAnimation()
             } else {
-                if(viewState.browserShowing) {
+                if (viewState.browserShowing) {
                     omnibarScrolling.enableOmnibarScrolling(toolbarContainer)
                 }
                 pulseAnimation.stop()

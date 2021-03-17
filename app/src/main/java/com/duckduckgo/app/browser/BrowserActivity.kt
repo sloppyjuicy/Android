@@ -375,9 +375,13 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
     }
 
     private fun hideMockupOmnibar() {
-        Handler().postDelayed( {
-            appBarLayoutMockup?.visibility = View.GONE
-        }, 300)
+        // Delaying this code to avoid race condition when fragment and activity recreated
+        Handler().postDelayed(
+            {
+                appBarLayoutMockup?.visibility = View.GONE
+            },
+            300
+        )
     }
 
     companion object {
