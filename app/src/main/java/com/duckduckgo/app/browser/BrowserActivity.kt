@@ -21,6 +21,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.Intent.EXTRA_TEXT
 import android.os.Bundle
+import android.os.Handler
 import android.os.Message
 import android.view.View
 import android.widget.Toast
@@ -374,7 +375,9 @@ class BrowserActivity : DuckDuckGoActivity(), CoroutineScope by MainScope() {
     }
 
     private fun hideMockupOmnibar() {
-        appBarLayoutMockup.visibility = View.GONE
+        Handler().postDelayed( {
+            appBarLayoutMockup?.visibility = View.GONE
+        }, 300)
     }
 
     companion object {
