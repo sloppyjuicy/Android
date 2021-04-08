@@ -67,7 +67,7 @@ import com.duckduckgo.app.usage.search.SearchCountDao
 import com.duckduckgo.app.usage.search.SearchCountEntity
 
 @Database(
-    exportSchema = true, version = 31,
+    exportSchema = true, version = 32,
     entities = [
         TdsTracker::class,
         TdsEntity::class,
@@ -399,7 +399,8 @@ class MigrationsProvider(
 
     val BOOKMARKS_DB_ON_CREATE = object : RoomDatabase.Callback() {
         override fun onCreate(database: SupportSQLiteDatabase) {
-            MIGRATION_29_TO_30.migrate(database)
+            // fixme: neex to fix
+//            MIGRATION_29_TO_30.migrate(database)
         }
     }
 
