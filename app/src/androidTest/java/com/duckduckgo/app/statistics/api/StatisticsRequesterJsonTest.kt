@@ -19,17 +19,22 @@ package com.duckduckgo.app.statistics.api
 import android.net.Uri
 import androidx.core.net.toUri
 import androidx.test.platform.app.InstrumentationRegistry
-import com.duckduckgo.app.FileUtilities.loadText
-import com.duckduckgo.app.InstantSchedulersRule
-import com.duckduckgo.app.global.AppUrl.ParamKey
-import com.duckduckgo.app.statistics.Variant
-import com.duckduckgo.app.statistics.VariantManager
 import com.duckduckgo.app.statistics.model.Atb
 import com.duckduckgo.app.statistics.store.StatisticsDataStore
 import com.duckduckgo.app.statistics.store.StatisticsSharedPreferences
-import com.nhaarman.mockitokotlin2.mock
-import com.nhaarman.mockitokotlin2.whenever
+import com.duckduckgo.autofill.api.email.EmailManager
+import com.duckduckgo.common.test.CoroutineTestRule
+import com.duckduckgo.common.test.FileUtilities.loadText
+import com.duckduckgo.common.test.InstantSchedulersRule
+import com.duckduckgo.common.utils.AppUrl.ParamKey
+import com.duckduckgo.common.utils.plugins.PluginPoint
+import com.duckduckgo.experiments.api.VariantManager
 import com.squareup.moshi.Moshi
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.test.TestScope
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -39,13 +44,11 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.whenever
 import retrofit2.Retrofit
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory
 import retrofit2.converter.moshi.MoshiConverterFactory
-import java.net.InetAddress
-import java.net.InetSocketAddress
-import java.net.Proxy
-import java.util.concurrent.TimeUnit
 
 class StatisticsRequesterJsonTest {
 
@@ -54,12 +57,15 @@ class StatisticsRequesterJsonTest {
     private lateinit var statisticsService: StatisticsService
     private lateinit var statisticsStore: StatisticsDataStore
     private lateinit var testee: StatisticsRequester
+    private var mockEmailManager: EmailManager = mock()
 
     private val server = MockWebServer()
 
     @get:Rule
-    @Suppress("unused")
     val schedulers = InstantSchedulersRule()
+
+    @get:Rule
+    val coroutineTestRule: CoroutineTestRule = CoroutineTestRule()
 
     @Before
     fun before() {
@@ -68,8 +74,21 @@ class StatisticsRequesterJsonTest {
         statisticsStore = StatisticsSharedPreferences(InstrumentationRegistry.getInstrumentation().targetContext)
         statisticsStore.clearAtb()
 
-        testee = StatisticsRequester(statisticsStore, statisticsService, mockVariantManager)
-        whenever(mockVariantManager.getVariant()).thenReturn(Variant("ma", 100.0, filterBy = { true }))
+        val plugins = object : PluginPoint<AtbLifecyclePlugin> {
+            override fun getPlugins(): Collection<AtbLifecyclePlugin> {
+                return listOf()
+            }
+        }
+        testee = StatisticsRequester(
+            statisticsStore,
+            statisticsService,
+            mockVariantManager,
+            plugins,
+            mockEmailManager,
+            TestScope(),
+            coroutineTestRule.testDispatcherProvider,
+        )
+        whenever(mockVariantManager.getVariantKey()).thenReturn("ma")
     }
 
     @After
@@ -308,16 +327,22 @@ class StatisticsRequesterJsonTest {
         assertEquals("1", testParam)
     }
 
-    private fun queueResponseFromFile(filename: String, responseCode: Int = 200) {
+    private fun queueResponseFromFile(
+        filename: String,
+        responseCode: Int = 200,
+    ) {
         val response = MockResponse()
-            .setBody(loadText("$JSON_DIR/$filename"))
+            .setBody(loadText(StatisticsRequesterJsonTest::class.java.classLoader!!, "$JSON_DIR/$filename"))
             .setResponseCode(responseCode)
 
         queueResponse(response)
     }
 
     @Suppress("SameParameterValue")
-    private fun queueResponseFromString(responseBody: String, responseCode: Int = 200) {
+    private fun queueResponseFromString(
+        responseBody: String,
+        responseCode: Int = 200,
+    ) {
         val response = MockResponse()
             .setBody(responseBody)
             .setResponseCode(responseCode)

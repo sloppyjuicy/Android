@@ -21,15 +21,12 @@ package com.duckduckgo.app.browser.favicon
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.test.platform.app.InstrumentationRegistry
-import com.duckduckgo.app.CoroutineTestRule
 import com.duckduckgo.app.global.file.FileDeleter
-import com.duckduckgo.app.global.sha256
-import com.duckduckgo.app.runBlocking
-import com.nhaarman.mockitokotlin2.any
-import com.nhaarman.mockitokotlin2.argumentCaptor
-import com.nhaarman.mockitokotlin2.mock
-import com.nhaarman.mockitokotlin2.verify
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import com.duckduckgo.common.test.CoroutineTestRule
+import com.duckduckgo.common.utils.sha256
+import java.io.File
+import java.io.FileOutputStream
+import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -38,10 +35,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
-import java.io.File
-import java.io.FileOutputStream
+import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
 
-@ExperimentalCoroutinesApi
 class FileBasedFaviconPersisterTest {
 
     @get:Rule
@@ -61,12 +59,12 @@ class FileBasedFaviconPersisterTest {
     }
 
     @After
-    fun after() = coroutineRule.runBlocking {
+    fun after() = runTest {
         deleteTestFolders()
     }
 
     @Test
-    fun whenDeleteAllCalledThenEntireDirectoryDeleted() = coroutineRule.runBlocking {
+    fun whenDeleteAllCalledThenEntireDirectoryDeleted() = runTest {
         testee.deleteAll(testDirectory)
         val captor = argumentCaptor<File>()
 
@@ -75,7 +73,7 @@ class FileBasedFaviconPersisterTest {
     }
 
     @Test
-    fun whenFaviconFileReturnedThenCorrectDirectoryUsed() = coroutineRule.runBlocking {
+    fun whenFaviconFileReturnedThenCorrectDirectoryUsed() = runTest {
         createNewFile()
         val file = testee.faviconFile(testDirectory, subFolder, domain)
 
@@ -85,7 +83,7 @@ class FileBasedFaviconPersisterTest {
     }
 
     @Test
-    fun whenCopyToDirectoryThenFileCopiedToNewDirectory() = coroutineRule.runBlocking {
+    fun whenCopyToDirectoryThenFileCopiedToNewDirectory() = runTest {
         val filename = "newFileName"
         createNewFile()
 
@@ -93,11 +91,10 @@ class FileBasedFaviconPersisterTest {
 
         val newFile = testee.faviconFile(secondaryTestDirectory, subFolder, filename)
         verifyDirectoryUse(newFile!!.absolutePath, secondaryTestDirectory)
-
     }
 
     @Test
-    fun whenStoreBitmapCorrectlyThenReturnFile() = coroutineRule.runBlocking {
+    fun whenStoreBitmapCorrectlyThenReturnFile() = runTest {
         val bitmap: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.RGB_565)
 
         val file = testee.store(testDirectory, subFolder, bitmap, "filename")
@@ -107,7 +104,7 @@ class FileBasedFaviconPersisterTest {
     }
 
     @Test
-    fun whenStoreBitmapAndSizeIsBiggerThanPreviouslySavedThenReturnNewFile() = coroutineRule.runBlocking {
+    fun whenStoreBitmapAndSizeIsBiggerThanPreviouslySavedThenReturnNewFile() = runTest {
         val bitmap: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.RGB_565)
         val newBitmap: Bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.RGB_565)
 
@@ -120,7 +117,7 @@ class FileBasedFaviconPersisterTest {
     }
 
     @Test
-    fun whenStoreBitmapAndSizeIsSmallerThanPreviouslySavedThenReturnNull() = coroutineRule.runBlocking {
+    fun whenStoreBitmapAndSizeIsSmallerThanPreviouslySavedThenReturnNull() = runTest {
         val bitmap: Bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.RGB_565)
         val newBitmap: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.RGB_565)
 
@@ -131,7 +128,7 @@ class FileBasedFaviconPersisterTest {
     }
 
     @Test
-    fun whenStoreBitmapAndSizeIsEqualsThanPreviouslySavedThenDoesNotReturnNull() = coroutineRule.runBlocking {
+    fun whenStoreBitmapAndSizeIsEqualsThanPreviouslySavedThenDoesNotReturnNull() = runTest {
         val bitmap: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.RGB_565)
         val newBitmap: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.RGB_565)
 
@@ -142,8 +139,7 @@ class FileBasedFaviconPersisterTest {
     }
 
     @Test
-    fun whenDeletePersistedFaviconThenDeleteTheFile() = coroutineRule.runBlocking {
-
+    fun whenDeletePersistedFaviconThenDeleteTheFile() = runTest {
         val captor = argumentCaptor<List<String>>()
 
         testee.deletePersistedFavicon("domain")
@@ -151,13 +147,13 @@ class FileBasedFaviconPersisterTest {
     }
 
     @Test
-    fun whenDeletingNonSpecificFaviconForSubfolderThenDeleteTheDirectory() = coroutineRule.runBlocking {
+    fun whenDeletingNonSpecificFaviconForSubfolderThenDeleteTheDirectory() = runTest {
         testee.deleteFaviconsForSubfolder(testDirectory, subFolder, domain = null)
         verify(mockFileDeleter).deleteDirectory(any())
     }
 
     @Test
-    fun whenDeletingOldFaviconForATabButANewOneExistsThenOnlySingleFaviconDeleted() = coroutineRule.runBlocking {
+    fun whenDeletingOldFaviconForATabButANewOneExistsThenOnlySingleFaviconDeleted() = runTest {
         val newFaviconFilename = "newFavicon"
         val captor = argumentCaptor<List<String>>()
         testee.deleteFaviconsForSubfolder(testDirectory, subFolder, newFaviconFilename)
@@ -165,12 +161,18 @@ class FileBasedFaviconPersisterTest {
         verifyExistingFaviconExcludedFromDeletion(captor.firstValue, newFaviconFilename)
     }
 
-    private fun verifyExistingFaviconExcludedFromDeletion(exclusionList: List<String>, newTabFaviconFilename: String) {
+    private fun verifyExistingFaviconExcludedFromDeletion(
+        exclusionList: List<String>,
+        newTabFaviconFilename: String,
+    ) {
         assertEquals(1, exclusionList.size)
         assertTrue(exclusionList.contains(newTabFaviconFilename))
     }
 
-    private fun verifySubfolderUsedAsDirectory(subFolder: String, path: File) {
+    private fun verifySubfolderUsedAsDirectory(
+        subFolder: String,
+        path: File,
+    ) {
         assertTrue(path.parent!!.endsWith(subFolder))
     }
 
@@ -178,7 +180,10 @@ class FileBasedFaviconPersisterTest {
         assertTrue(path.startsWith(context.cacheDir.absolutePath))
     }
 
-    private fun verifyDirectoryUse(path: String, directory: String) {
+    private fun verifyDirectoryUse(
+        path: String,
+        directory: String,
+    ) {
         assertTrue(path.contains("/$directory"))
     }
 

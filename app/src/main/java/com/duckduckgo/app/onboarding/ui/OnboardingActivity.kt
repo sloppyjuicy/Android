@@ -19,20 +19,28 @@ package com.duckduckgo.app.onboarding.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import com.duckduckgo.anvil.annotations.InjectWith
 import com.duckduckgo.app.browser.BrowserActivity
-import com.duckduckgo.app.browser.R
-import com.duckduckgo.app.global.DuckDuckGoActivity
-import kotlinx.android.synthetic.main.activity_onboarding.*
+import com.duckduckgo.app.browser.databinding.ActivityOnboardingBinding
+import com.duckduckgo.common.ui.DuckDuckGoActivity
+import com.duckduckgo.common.ui.viewbinding.viewBinding
+import com.duckduckgo.di.scopes.ActivityScope
 
+@InjectWith(ActivityScope::class)
 class OnboardingActivity : DuckDuckGoActivity() {
 
     private lateinit var viewPageAdapter: PagerAdapter
 
     private val viewModel: OnboardingViewModel by bindViewModel()
 
+    private val binding: ActivityOnboardingBinding by viewBinding()
+
+    private val viewPager
+        get() = binding.viewPager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_onboarding)
+        setContentView(binding.root)
         configurePager()
     }
 
@@ -41,10 +49,14 @@ class OnboardingActivity : DuckDuckGoActivity() {
         if (next < viewPager.adapter!!.count) {
             viewPager.setCurrentItem(next, true)
         } else {
-            viewModel.onOnboardingDone()
-            startActivity(BrowserActivity.intent(this@OnboardingActivity))
-            finish()
+            onOnboardingDone()
         }
+    }
+
+    private fun onOnboardingDone() {
+        viewModel.onOnboardingDone()
+        startActivity(BrowserActivity.intent(this@OnboardingActivity))
+        finish()
     }
 
     private fun configurePager() {
@@ -57,6 +69,7 @@ class OnboardingActivity : DuckDuckGoActivity() {
     }
 
     override fun onBackPressed() {
+        super.onBackPressed()
         val currentPage = viewPager.currentItem
         if (currentPage == 0) {
             finish()

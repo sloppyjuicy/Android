@@ -17,15 +17,25 @@
   -->
 
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
     android:id="@+id/fireActivityRoot"
+    android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     tools:context="com.duckduckgo.app.fire.fireproofwebsite.ui.FireproofWebsitesActivity">
 
-    <include layout="@layout/include_toolbar" />
+    <include
+        android:id="@+id/includeToolbar"
+        layout="@layout/include_default_toolbar" />
 
-    <include layout="@layout/content_fireproof_websites" />
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:paddingTop="@dimen/keyline_4"
+        android:paddingBottom="@dimen/keyline_4"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+        tools:listItem="@layout/view_bookmark_entry" />
 
 </LinearLayout>

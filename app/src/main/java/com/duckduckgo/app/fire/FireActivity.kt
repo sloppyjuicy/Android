@@ -17,15 +17,15 @@
 package com.duckduckgo.app.fire
 
 import android.app.Activity
-import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.os.Process
 import androidx.appcompat.app.AppCompatActivity
+import com.duckduckgo.anvil.annotations.InjectWith
 import com.duckduckgo.app.browser.BrowserActivity
-import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.global.view.fadeTransitionConfig
+import com.duckduckgo.app.global.view.noAnimationConfig
+import com.duckduckgo.di.scopes.ActivityScope
 
 /**
  * Activity which is responsible for killing the main process and restarting it. This Activity will automatically finish itself after a brief time.
@@ -36,58 +36,57 @@ import com.duckduckgo.app.global.view.fadeTransitionConfig
  *
  * This Activity was largely inspired by https://github.com/JakeWharton/ProcessPhoenix
  */
+@InjectWith(ActivityScope::class)
 class FireActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val intent = intent.getParcelableExtra<Intent>(KEY_RESTART_INTENTS)
         startActivity(intent, fadeTransitionConfig())
+        overridePendingTransition(0, 0)
         finish()
         killProcess()
-    }
-
-    override fun onBackPressed() {
-        // do nothing - the activity will kill itself soon enough
     }
 
     companion object {
         private const val KEY_RESTART_INTENTS = "KEY_RESTART_INTENTS"
 
-        fun triggerRestart(context: Context, notifyDataCleared: Boolean) {
-            triggerRestart(context, getRestartIntent(context, notifyDataCleared))
-        }
-
-        private fun triggerRestart(context: Context, nextIntent: Intent) {
+        fun triggerRestart(
+            context: Context,
+            notifyDataCleared: Boolean,
+            enableTransitionAnimation: Boolean = true,
+        ) {
             val intent = Intent(context, FireActivity::class.java)
+            val nextIntent = getRestartIntent(context, notifyDataCleared)
+
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             intent.putExtra(KEY_RESTART_INTENTS, nextIntent)
 
-            context.startActivity(intent, context.fadeTransitionConfig())
+            val transitionAnimationConfig = if (enableTransitionAnimation) {
+                context.fadeTransitionConfig()
+            } else {
+                context.noAnimationConfig()
+            }
+
+            context.startActivity(intent, transitionAnimationConfig)
             if (context is Activity) {
+                context.overridePendingTransition(0, 0)
                 context.finish()
             }
             killProcess()
         }
 
-        private fun getRestartIntent(context: Context, notifyDataCleared: Boolean = false): Intent {
-            val intent = BrowserActivity.intent(context, notifyDataCleared = notifyDataCleared)
+        private fun getRestartIntent(
+            context: Context,
+            notifyDataCleared: Boolean = false,
+        ): Intent {
+            val intent = BrowserActivity.intent(context, notifyDataCleared = notifyDataCleared, isLaunchFromClearDataAction = true)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             return intent
         }
 
         private fun killProcess() {
             Runtime.getRuntime().exit(0)
-        }
-
-        fun appRestarting(context: Context): Boolean {
-            val currentProcessId = Process.myPid()
-            val activityManager: ActivityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-            activityManager.runningAppProcesses?.forEach {
-                if (it.pid == currentProcessId && it.processName.endsWith(context.getString(R.string.fireProcessName))) {
-                    return true
-                }
-            }
-            return false
         }
     }
 }

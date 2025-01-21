@@ -17,38 +17,20 @@
 package com.duckduckgo.app.email.di
 
 import android.content.Context
-import com.duckduckgo.app.browser.DuckDuckGoUrlDetector
-import com.duckduckgo.app.di.AppCoroutineScope
-import com.duckduckgo.app.email.AppEmailManager
-import com.duckduckgo.app.email.EmailInjector
-import com.duckduckgo.app.email.EmailInjectorJs
-import com.duckduckgo.app.email.EmailManager
-import com.duckduckgo.app.email.api.EmailService
 import com.duckduckgo.app.email.db.EmailDataStore
 import com.duckduckgo.app.email.db.EmailEncryptedSharedPreferences
-import com.duckduckgo.app.global.DispatcherProvider
 import com.duckduckgo.app.statistics.pixels.Pixel
 import dagger.Module
 import dagger.Provides
-import kotlinx.coroutines.CoroutineScope
-import javax.inject.Singleton
 
 @Module
 class EmailModule {
 
-    @Singleton
     @Provides
-    fun providesEmailManager(emailService: EmailService, emailDataStore: EmailDataStore, dispatcherProvider: DispatcherProvider, @AppCoroutineScope appCoroutineScope: CoroutineScope): EmailManager {
-        return AppEmailManager(emailService, emailDataStore, dispatcherProvider, appCoroutineScope)
-    }
-
-    @Provides
-    fun providesEmailInjector(emailManager: EmailManager, duckDuckGoUrlDetector: DuckDuckGoUrlDetector): EmailInjector {
-        return EmailInjectorJs(emailManager, duckDuckGoUrlDetector)
-    }
-
-    @Provides
-    fun providesEmailDataStore(context: Context, pixel: Pixel): EmailDataStore {
+    fun providesEmailDataStore(
+        context: Context,
+        pixel: Pixel,
+    ): EmailDataStore {
         return EmailEncryptedSharedPreferences(context, pixel)
     }
 }

@@ -14,43 +14,38 @@
   ~ limitations under the License.
   -->
 
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/settingsSectionOther"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
 
-    <TextView
+    <com.duckduckgo.common.ui.view.divider.HorizontalDivider
+        android:id="@+id/settingsOtherDivider"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <com.duckduckgo.common.ui.view.listitem.SectionHeaderListItem
         android:id="@+id/settingsOtherTitle"
-        style="@style/SettingsSectionTitle"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:text="@string/settingsHeadingOther" />
-
-    <TextView
-        android:id="@+id/about"
-        style="@style/SettingsItemClickable"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:text="@string/settingsAboutDuckduckgo"
-        app:layout_constraintTop_toBottomOf="@id/settingsOtherTitle" />
-
-    <TextView
-        android:id="@+id/provideFeedback"
-        style="@style/SettingsItemClickable"
-        android:text="@string/leaveFeedback"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/about" />
-
-    <com.duckduckgo.app.settings.SettingsOptionWithSubtitle
-        android:id="@+id/version"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/provideFeedback"
-        app:title="@string/settingsVersion"
-        tools:subtitle="123.43.5456" />
+        app:primaryText="@string/settingsHeadingMore" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    <com.duckduckgo.common.ui.view.listitem.TwoLineListItem
+        android:id="@+id/macOsSetting"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:primaryText="@string/macos_settings_title"
+        app:primaryTextTruncated="false"
+        app:secondaryText="@string/macos_settings_description" />
+
+    <com.duckduckgo.common.ui.view.listitem.TwoLineListItem
+        android:id="@+id/windowsSetting"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:primaryText="@string/windows_settings_title"
+        app:primaryTextTruncated="false"
+        app:secondaryText="@string/windows_settings_description" />
+
+</LinearLayout>

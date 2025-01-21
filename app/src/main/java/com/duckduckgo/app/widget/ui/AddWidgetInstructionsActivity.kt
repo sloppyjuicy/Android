@@ -19,46 +19,51 @@ package com.duckduckgo.app.widget.ui
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import androidx.lifecycle.Observer
-import com.duckduckgo.app.browser.R
-import com.duckduckgo.app.global.DuckDuckGoActivity
+import com.duckduckgo.anvil.annotations.InjectWith
+import com.duckduckgo.app.browser.databinding.ActivityAddWidgetInstructionsBinding
 import com.duckduckgo.app.widget.ui.AddWidgetInstructionsViewModel.Command.Close
 import com.duckduckgo.app.widget.ui.AddWidgetInstructionsViewModel.Command.ShowHome
-import kotlinx.android.synthetic.main.include_add_widget_instruction_buttons.*
+import com.duckduckgo.common.ui.DuckDuckGoActivity
+import com.duckduckgo.common.ui.viewbinding.viewBinding
+import com.duckduckgo.di.scopes.ActivityScope
 
+@InjectWith(ActivityScope::class)
 class AddWidgetInstructionsActivity : DuckDuckGoActivity() {
+
+    private val binding: ActivityAddWidgetInstructionsBinding by viewBinding()
 
     private val viewModel: AddWidgetInstructionsViewModel by bindViewModel()
 
+    private val instructionsButtons
+        get() = binding.includeAddWidgetInstructionButtons
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_add_widget_instructions)
+        setContentView(binding.root)
         configureListeners()
         configureCommandObserver()
     }
 
     private fun configureListeners() {
-        homeButton.setOnClickListener {
+        instructionsButtons.homeButton.setOnClickListener {
             viewModel.onShowHomePressed()
         }
-        closeButton.setOnClickListener {
+        instructionsButtons.closeButton.setOnClickListener {
             viewModel.onClosePressed()
         }
     }
 
     private fun configureCommandObserver() {
-        viewModel.command.observe(
-            this,
-            Observer {
-                when (it) {
-                    ShowHome -> showHome()
-                    Close -> close()
-                }
+        viewModel.command.observe(this) {
+            when (it) {
+                ShowHome -> showHome()
+                Close -> close()
             }
-        )
+        }
     }
 
     override fun onBackPressed() {
+        super.onBackPressed()
         viewModel.onClosePressed()
     }
 

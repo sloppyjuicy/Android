@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 DuckDuckGo
+ * Copyright (c) 2023 DuckDuckGo
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,92 +16,16 @@
 
 package com.duckduckgo.app.email.db
 
-import android.content.Context
-import android.content.SharedPreferences
-import androidx.core.content.edit
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
-import com.duckduckgo.app.pixels.AppPixelName
-import com.duckduckgo.app.statistics.pixels.Pixel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import java.io.IOException
-import java.security.GeneralSecurityException
-
+/**
+ * Data store for Email Protection (duck addresses)
+ *
+ * Provides ability to store and retrieve data related to the duck address feature such as personal username, next alias etc...
+ */
 interface EmailDataStore {
     var emailToken: String?
     var nextAlias: String?
     var emailUsername: String?
-    fun nextAliasFlow(): StateFlow<String?>
-}
-
-@FlowPreview
-@ExperimentalCoroutinesApi
-class EmailEncryptedSharedPreferences(private val context: Context, private val pixel: Pixel) : EmailDataStore {
-
-    private val encryptedPreferences: SharedPreferences? = encryptedPreferences()
-    private val nextAliasSharedFlow: MutableStateFlow<String?> = MutableStateFlow(nextAlias)
-    override fun nextAliasFlow(): StateFlow<String?> = nextAliasSharedFlow.asStateFlow()
-
-    @Synchronized
-    private fun encryptedPreferences(): SharedPreferences? {
-        try {
-            return EncryptedSharedPreferences.create(
-                context,
-                FILENAME,
-                MasterKey.Builder(context)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build(),
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (e: IOException) {
-            pixel.enqueueFire(AppPixelName.ENCRYPTED_IO_EXCEPTION)
-        } catch (e: GeneralSecurityException) {
-            pixel.enqueueFire(AppPixelName.ENCRYPTED_GENERAL_EXCEPTION)
-        }
-        return null
-    }
-
-    override var emailToken: String?
-        get() = encryptedPreferences?.getString(KEY_EMAIL_TOKEN, null)
-        set(value) {
-            encryptedPreferences?.edit(commit = true) {
-                if (value == null) remove(KEY_EMAIL_TOKEN)
-                else putString(KEY_EMAIL_TOKEN, value)
-            }
-        }
-
-    override var nextAlias: String?
-        get() = encryptedPreferences?.getString(KEY_NEXT_ALIAS, null)
-        set(value) {
-            encryptedPreferences?.edit(commit = true) {
-                if (value == null) remove(KEY_NEXT_ALIAS)
-                else putString(KEY_NEXT_ALIAS, value)
-                GlobalScope.launch {
-                    nextAliasSharedFlow.emit(value)
-                }
-            }
-        }
-
-    override var emailUsername: String?
-        get() = encryptedPreferences?.getString(KEY_EMAIL_USERNAME, null)
-        set(value) {
-            encryptedPreferences?.edit(commit = true) {
-                if (value == null) remove(KEY_EMAIL_USERNAME)
-                else putString(KEY_EMAIL_USERNAME, value)
-            }
-        }
-
-    companion object {
-        const val FILENAME = "com.duckduckgo.app.email.settings"
-        const val KEY_EMAIL_TOKEN = "KEY_EMAIL_TOKEN"
-        const val KEY_EMAIL_USERNAME = "KEY_EMAIL_USERNAME"
-        const val KEY_NEXT_ALIAS = "KEY_NEXT_ALIAS"
-    }
+    var cohort: String?
+    var lastUsedDate: String?
+    fun canUseEncryption(): Boolean
 }

@@ -16,12 +16,11 @@
 
 package com.duckduckgo.app.onboarding.store
 
-import androidx.lifecycle.LifecycleObserver
-import com.duckduckgo.app.global.DispatcherProvider
-import kotlinx.coroutines.withContext
+import com.duckduckgo.common.utils.DispatcherProvider
 import javax.inject.Inject
+import kotlinx.coroutines.withContext
 
-interface UserStageStore : LifecycleObserver {
+interface UserStageStore {
     suspend fun getUserAppStage(): AppStage
     suspend fun stageCompleted(appStage: AppStage): AppStage
     suspend fun moveToStage(appStage: AppStage)
@@ -29,7 +28,7 @@ interface UserStageStore : LifecycleObserver {
 
 class AppUserStageStore @Inject constructor(
     private val userStageDao: UserStageDao,
-    private val dispatcher: DispatcherProvider
+    private val dispatcher: DispatcherProvider,
 ) : UserStageStore {
 
     override suspend fun getUserAppStage(): AppStage {
@@ -58,7 +57,6 @@ class AppUserStageStore @Inject constructor(
     override suspend fun moveToStage(appStage: AppStage) {
         userStageDao.updateUserStage(appStage)
     }
-
 }
 
 suspend fun UserStageStore.isNewUser(): Boolean {

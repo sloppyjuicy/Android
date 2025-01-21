@@ -21,31 +21,48 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.widget.Toast
+import androidx.annotation.VisibleForTesting
+import com.duckduckgo.anvil.annotations.InjectWith
 import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.browser.shortcut.ShortcutBuilder.Companion.SHORTCUT_TITLE_ARG
-import com.duckduckgo.app.global.DispatcherProvider
+import com.duckduckgo.app.di.AppCoroutineScope
 import com.duckduckgo.app.pixels.AppPixelName
 import com.duckduckgo.app.statistics.pixels.Pixel
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import com.duckduckgo.common.utils.DispatcherProvider
+import com.duckduckgo.di.scopes.ReceiverScope
+import dagger.android.AndroidInjection
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
-class ShortcutReceiver @Inject constructor(
-    private val pixel: Pixel,
-    private val dispatcher: DispatcherProvider
-) :
-    BroadcastReceiver() {
+@InjectWith(ReceiverScope::class)
+class ShortcutReceiver : BroadcastReceiver() {
 
-    override fun onReceive(context: Context?, intent: Intent?) {
+    @Inject
+    lateinit var pixel: Pixel
+
+    @Inject lateinit var dispatcher: DispatcherProvider
+
+    @Inject @AppCoroutineScope
+    lateinit var appCoroutineScope: CoroutineScope
+
+    override fun onReceive(
+        context: Context,
+        intent: Intent?,
+    ) {
+        AndroidInjection.inject(this, context)
+        onShortcutAdded(context, intent)
+    }
+
+    @VisibleForTesting
+    fun onShortcutAdded(context: Context?, intent: Intent?) {
         val title = intent?.getStringExtra(SHORTCUT_TITLE_ARG)
-
         if (!IGNORE_MANUFACTURERS_LIST.contains(Build.MANUFACTURER)) {
             context?.let {
                 Toast.makeText(it, it.getString(R.string.shortcutAddedText, title), Toast.LENGTH_SHORT).show()
             }
         }
-
-        GlobalScope.launch(dispatcher.io()) {
+        appCoroutineScope.launch(dispatcher.io()) {
             pixel.fire(AppPixelName.SHORTCUT_ADDED)
         }
     }

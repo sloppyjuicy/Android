@@ -17,45 +17,58 @@
 package com.duckduckgo.app.feedback.ui.negative.mainreason
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.duckduckgo.app.browser.R
 import com.duckduckgo.app.feedback.ui.negative.FeedbackTypeDisplay.FeedbackTypeMainReasonDisplay
-import kotlinx.android.synthetic.main.item_feedback_reason.view.*
+import com.duckduckgo.mobile.android.databinding.RowOneLineListItemBinding
 
 class MainReasonAdapter(private val itemClickListener: (FeedbackTypeMainReasonDisplay) -> Unit) :
     ListAdapter<FeedbackTypeMainReasonDisplay, MainReasonAdapter.ViewHolder>(DiffCallback()) {
 
     class DiffCallback : DiffUtil.ItemCallback<FeedbackTypeMainReasonDisplay>() {
-        override fun areItemsTheSame(oldItem: FeedbackTypeMainReasonDisplay, newItem: FeedbackTypeMainReasonDisplay): Boolean {
+        override fun areItemsTheSame(
+            oldItem: FeedbackTypeMainReasonDisplay,
+            newItem: FeedbackTypeMainReasonDisplay,
+        ): Boolean {
             return oldItem == newItem
         }
 
-        override fun areContentsTheSame(oldItem: FeedbackTypeMainReasonDisplay, newItem: FeedbackTypeMainReasonDisplay): Boolean {
+        override fun areContentsTheSame(
+            oldItem: FeedbackTypeMainReasonDisplay,
+            newItem: FeedbackTypeMainReasonDisplay,
+        ): Boolean {
             return oldItem == newItem
         }
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+    override fun onCreateViewHolder(
+        parent: ViewGroup,
+        viewType: Int,
+    ): ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
-        val root = inflater.inflate(R.layout.item_feedback_reason, parent, false)
-        return ViewHolder(root, root.reason)
+        val binding = RowOneLineListItemBinding.inflate(inflater, parent, false)
+        return ViewHolder(binding)
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+    override fun onBindViewHolder(
+        holder: ViewHolder,
+        position: Int,
+    ) {
         holder.bind(getItem(position), itemClickListener)
     }
 
-    data class ViewHolder(val root: View, val reasonTextView: TextView) : RecyclerView.ViewHolder(root) {
+    data class ViewHolder(val binding: RowOneLineListItemBinding) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(reason: FeedbackTypeMainReasonDisplay, clickListener: (FeedbackTypeMainReasonDisplay) -> Unit) {
-            reasonTextView.text = root.context.getString(reason.listDisplayResId)
-            itemView.setOnClickListener { clickListener(reason) }
+        fun bind(
+            reason: FeedbackTypeMainReasonDisplay,
+            clickListener: (FeedbackTypeMainReasonDisplay) -> Unit,
+        ) {
+            val listItem = binding.root
+            listItem.setLeadingIconVisibility(false)
+            listItem.setPrimaryText(binding.root.context.getString(reason.listDisplayResId))
+            listItem.setOnClickListener { clickListener(reason) }
         }
     }
-
 }

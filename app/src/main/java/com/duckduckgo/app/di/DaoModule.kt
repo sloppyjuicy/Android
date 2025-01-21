@@ -21,13 +21,7 @@ import dagger.Module
 import dagger.Provides
 
 @Module
-class DaoModule {
-
-    @Provides
-    fun providesHttpsFalsePositivesDao(database: AppDatabase) = database.httpsFalsePositivesDao()
-
-    @Provides
-    fun provideHttpsBloomFilterSpecDao(database: AppDatabase) = database.httpsBloomFilterSpecDao()
+object DaoModule {
 
     @Provides
     fun providesTdsTrackDao(database: AppDatabase) = database.tdsTrackerDao()
@@ -39,16 +33,22 @@ class DaoModule {
     fun providesTdsDomainEntityDao(database: AppDatabase) = database.tdsDomainEntityDao()
 
     @Provides
-    fun providesTemporaryTrackingWhitelist(database: AppDatabase) = database.temporaryTrackingWhitelistDao()
+    fun providesTdsCnameEntityDao(database: AppDatabase) = database.tdsCnameEntityDao()
 
     @Provides
-    fun providesUserWhitelist(database: AppDatabase) = database.userWhitelistDao()
+    fun providesUserAllowList(database: AppDatabase) = database.userAllowListDao()
 
     @Provides
     fun providesNetworkLeaderboardDao(database: AppDatabase) = database.networkLeaderboardDao()
 
     @Provides
     fun providesBookmarksDao(database: AppDatabase) = database.bookmarksDao()
+
+    @Provides
+    fun providesFavoritesDao(database: AppDatabase) = database.favoritesDao()
+
+    @Provides
+    fun providesBookmarkFoldersDao(database: AppDatabase) = database.bookmarkFoldersDao()
 
     @Provides
     fun providesTabsDao(database: AppDatabase) = database.tabsDao()
@@ -72,9 +72,6 @@ class DaoModule {
     fun privacyProtectionCounts(database: AppDatabase) = database.privacyProtectionCountsDao()
 
     @Provides
-    fun uncaughtExceptionDao(database: AppDatabase) = database.uncaughtExceptionDao()
-
-    @Provides
     fun tdsDao(database: AppDatabase) = database.tdsDao()
 
     @Provides
@@ -90,5 +87,14 @@ class DaoModule {
     fun locationPermissionsDao(database: AppDatabase) = database.locationPermissionsDao()
 
     @Provides
+    fun webTrackersBlockedDao(database: AppDatabase) = database.webTrackersBlockedDao()
+
+    @Provides
     fun allowedDomainsDao(database: AppDatabase) = database.authCookiesAllowedDomainsDao()
+
+    @Provides
+    fun syncEntitiesDao(database: AppDatabase) = database.syncEntitiesDao()
+
+    @Provides
+    fun syncRelationsDao(database: AppDatabase) = database.syncRelationsDao()
 }

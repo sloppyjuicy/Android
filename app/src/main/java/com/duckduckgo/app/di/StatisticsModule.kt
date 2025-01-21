@@ -17,89 +17,31 @@
 package com.duckduckgo.app.di
 
 import android.content.Context
-import androidx.lifecycle.LifecycleObserver
 import com.duckduckgo.app.global.db.AppDatabase
-import com.duckduckgo.app.global.device.ContextDeviceInfo
-import com.duckduckgo.app.global.device.DeviceInfo
-import com.duckduckgo.app.global.exception.UncaughtExceptionRepository
-import com.duckduckgo.app.statistics.AtbInitializer
-import com.duckduckgo.app.statistics.AtbInitializerListener
-import com.duckduckgo.app.statistics.VariantManager
 import com.duckduckgo.app.statistics.api.*
-import com.duckduckgo.app.statistics.pixels.RxBasedPixel
-import com.duckduckgo.app.statistics.pixels.Pixel
-import com.duckduckgo.app.statistics.store.OfflinePixelCountDataStore
 import com.duckduckgo.app.statistics.store.PendingPixelDao
-import com.duckduckgo.app.statistics.store.StatisticsDataStore
+import com.duckduckgo.common.utils.device.ContextDeviceInfo
+import com.duckduckgo.common.utils.device.DeviceInfo
+import com.duckduckgo.di.DaggerSet
+import com.duckduckgo.di.scopes.AppScope
+import com.squareup.anvil.annotations.ContributesTo
 import dagger.Module
 import dagger.Provides
-import dagger.multibindings.IntoSet
-import retrofit2.Retrofit
-import javax.inject.Named
-import javax.inject.Singleton
+import dagger.SingleInstanceIn
 
 @Module
-class StatisticsModule {
-
-    @Provides
-    fun statisticsService(@Named("api") retrofit: Retrofit): StatisticsService = retrofit.create(StatisticsService::class.java)
-
-    @Provides
-    fun statisticsUpdater(
-        statisticsDataStore: StatisticsDataStore,
-        statisticsService: StatisticsService,
-        variantManager: VariantManager
-    ): StatisticsUpdater =
-        StatisticsRequester(statisticsDataStore, statisticsService, variantManager)
-
-    @Provides
-    fun pixelService(@Named("nonCaching") retrofit: Retrofit): PixelService {
-        return retrofit.create(PixelService::class.java)
-    }
-
-    @Provides
-    fun pixel(
-        pixelSender: PixelSender
-    ): Pixel =
-        RxBasedPixel(pixelSender)
-
-    @Provides
-    @Singleton
-    fun pixelSender(
-        pixelService: PixelService,
-        statisticsDataStore: StatisticsDataStore,
-        variantManager: VariantManager,
-        deviceInfo: DeviceInfo,
-        pendingPixelDao: PendingPixelDao
-    ): PixelSender =
-        RxPixelSender(pixelService, pendingPixelDao, statisticsDataStore, variantManager, deviceInfo)
-
-    @Provides
-    @Singleton
-    @IntoSet
-    fun pixelSenderObserver(pixelSender: PixelSender): LifecycleObserver = pixelSender
+@ContributesTo(AppScope::class)
+object StatisticsModule {
 
     @Provides
     fun offlinePixelSender(
-        offlinePixelCountDataStore: OfflinePixelCountDataStore,
-        uncaughtExceptionRepository: UncaughtExceptionRepository,
-        pixelSender: PixelSender
-    ): OfflinePixelSender = OfflinePixelSender(offlinePixelCountDataStore, uncaughtExceptionRepository, pixelSender)
+        offlinePixels: DaggerSet<OfflinePixel>,
+    ): OfflinePixelSender = OfflinePixelSender(offlinePixels)
 
     @Provides
     fun deviceInfo(context: Context): DeviceInfo = ContextDeviceInfo(context)
 
-    @Provides
-    @Singleton
-    fun atbInitializer(
-        statisticsDataStore: StatisticsDataStore,
-        statisticsUpdater: StatisticsUpdater,
-        listeners: Set<@JvmSuppressWildcards AtbInitializerListener>
-    ): AtbInitializer {
-        return AtbInitializer(statisticsDataStore, statisticsUpdater, listeners)
-    }
-
-    @Singleton
+    @SingleInstanceIn(AppScope::class)
     @Provides
     fun pixelDao(database: AppDatabase): PendingPixelDao {
         return database.pixelDao()

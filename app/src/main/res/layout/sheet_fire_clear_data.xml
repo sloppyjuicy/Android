@@ -15,7 +15,6 @@
   -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -32,62 +31,25 @@
         android:id="@+id/fireDialogRootView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:orientation="vertical">
+        android:background="@drawable/rounded_top_corners_bottom_sheet_background"
+        android:orientation="vertical"
+        android:paddingTop="@dimen/actionBottomSheetVerticalPadding"
+        android:paddingBottom="@dimen/actionBottomSheetVerticalPadding">
 
-        <ViewStub
-            android:id="@+id/fireCtaViewStub"
+        <com.duckduckgo.common.ui.view.listitem.OneLineListItem
+            android:id="@+id/clearAllOption"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout="@layout/include_dax_dialog_cta" />
+            app:leadingIcon="@drawable/ic_fire_red"
+            app:primaryText="@string/fireClearAll"
+            app:primaryTextColorOverlay="?attr/daxColorDestructive" />
 
-        <androidx.constraintlayout.widget.ConstraintLayout
+        <com.duckduckgo.common.ui.view.listitem.OneLineListItem
+            android:id="@+id/cancelOption"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/white">
+            app:leadingIcon="@drawable/ic_close_24"
+            app:primaryText="@string/fireCancel" />
 
-            <TextView
-                android:id="@+id/clearAllOption"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackground"
-                app:drawableStartCompat="@drawable/icon_fire_glyph_24dp"
-                android:drawablePadding="24dp"
-                android:fontFamily="sans-serif"
-                android:paddingStart="24dp"
-                android:paddingTop="24dp"
-                android:paddingEnd="24dp"
-                android:paddingBottom="17dp"
-                android:text="@string/fireClearAll"
-                android:textColor="@color/brickOrange"
-                android:textSize="16sp"
-                android:textStyle="normal"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
-            <!-- Drawable tint does not work on API 21 so we have to use a pre-colored drawable -->
-            <TextView
-                android:id="@+id/cancelOption"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:background="?attr/selectableItemBackground"
-                app:drawableStartCompat="@drawable/ic_cancel_brownish_24dp"
-                android:drawablePadding="24dp"
-                android:fontFamily="sans-serif"
-                android:paddingStart="24dp"
-                android:paddingTop="17dp"
-                android:paddingEnd="24dp"
-                android:paddingBottom="24dp"
-                android:text="@string/fireCancel"
-                android:textColor="@color/brownishGray"
-                android:textSize="16sp"
-                android:textStyle="normal"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/clearAllOption"
-                tools:ignore="UnusedAttribute" />
-
-        </androidx.constraintlayout.widget.ConstraintLayout>
     </LinearLayout>
 </FrameLayout>

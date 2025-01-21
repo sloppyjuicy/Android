@@ -27,7 +27,6 @@ val Intent.intentText: String?
     }
 
 fun Intent.sanitize() {
-
     try {
         // The strings are empty to force unparcel() call in BaseBundle
         getStringExtra("")
@@ -35,7 +34,6 @@ fun Intent.sanitize() {
     } catch (e: BadParcelableException) {
         Timber.e(e, "Failed to read Parcelable from intent")
         replaceExtras(Bundle())
-
     } catch (e: RuntimeException) {
         Timber.e(e, "Failed to receive extras from intent")
         replaceExtras(Bundle())

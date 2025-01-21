@@ -19,17 +19,15 @@ package com.duckduckgo.app.global.events.db
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.room.Room
 import androidx.test.platform.app.InstrumentationRegistry
-import com.duckduckgo.app.CoroutineTestRule
 import com.duckduckgo.app.global.db.AppDatabase
-import com.duckduckgo.app.runBlocking
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import com.duckduckgo.common.test.CoroutineTestRule
+import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Test
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
+import org.junit.Test
 
-@ExperimentalCoroutinesApi
 class UserEventsDaoTest {
 
     @get:Rule
@@ -57,19 +55,19 @@ class UserEventsDaoTest {
     }
 
     @Test
-    fun whenGetUserEventAndDatabaseEmptyThenReturnNull() = coroutineRule.runBlocking {
+    fun whenGetUserEventAndDatabaseEmptyThenReturnNull() = runTest {
         assertNull(testee.getUserEvent(UserEventKey.FIRE_BUTTON_EXECUTED))
     }
 
     @Test
-    fun whenInsertingUserEventThenTimestampIsNotNull() = coroutineRule.runBlocking {
+    fun whenInsertingUserEventThenTimestampIsNotNull() = runTest {
         testee.registerUserEvent(UserEventKey.FIRE_BUTTON_EXECUTED)
 
         assertNotNull(testee.getUserEvent(UserEventKey.FIRE_BUTTON_EXECUTED)?.timestamp)
     }
 
     @Test
-    fun whenInsertingSameUserEventThenReplaceOldTimestamp() = coroutineRule.runBlocking {
+    fun whenInsertingSameUserEventThenReplaceOldTimestamp() = runTest {
         testee.registerUserEvent(UserEventKey.FIRE_BUTTON_EXECUTED)
         val timestamp = testee.getUserEvent(UserEventKey.FIRE_BUTTON_EXECUTED)?.timestamp
 
