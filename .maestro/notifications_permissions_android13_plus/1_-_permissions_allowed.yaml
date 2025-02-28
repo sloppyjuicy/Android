@@ -1,0 +1,39 @@
+appId: com.duckduckgo.mobile.android
+---
+- retry:
+      maxRetries: 3
+      commands:
+            - launchApp:
+                clearState: true
+                stopApp: true
+                permissions: { all: unset }
+            - assertVisible:
+                text: ".*Allow DuckDuckGo to send you notifications.*"
+            - tapOn: "Allow"
+            - assertVisible:
+                text: ".*Welcome to DuckDuckGo!.*"
+                optional: true
+            - assertVisible:
+                text: ".*Ready for a faster browser that keeps you protected?.*"
+            - tapOn: "let's do it!"
+            - assertVisible:
+                text: "Protections activated!"
+            - tapOn: "choose your browser"
+            - tapOn: "cancel"
+            - assertVisible:
+                text: ".*where should I put your address bar?.*"
+            - tapOn: "next"
+            - assertVisible:
+                text: ".*Try a search!.*"
+            - tapOn:
+                id: "com.duckduckgo.mobile.android:id/browserMenuImageView"
+            - tapOn:
+                text: "Downloads"
+            - assertVisible:
+                text: ".*No files downloaded yet.*"
+            - assertNotVisible:
+                text: ".*Find out when downloads are ready.*"
+            - assertNotVisible:
+                text: ".*Get a notification when downloads complete.*"
+            - assertNotVisible:
+                text: ".*Notify Me.*"

@@ -16,21 +16,28 @@
 
 package com.duckduckgo.app.onboarding.store
 
-import androidx.lifecycle.LifecycleObserver
-import com.duckduckgo.app.global.DispatcherProvider
-import kotlinx.coroutines.withContext
+import com.duckduckgo.common.utils.DispatcherProvider
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
-interface UserStageStore : LifecycleObserver {
+interface UserStageStore {
+    fun userAppStageFlow(): Flow<AppStage>
     suspend fun getUserAppStage(): AppStage
     suspend fun stageCompleted(appStage: AppStage): AppStage
     suspend fun moveToStage(appStage: AppStage)
+    val currentAppStage: Flow<AppStage>
 }
 
 class AppUserStageStore @Inject constructor(
     private val userStageDao: UserStageDao,
-    private val dispatcher: DispatcherProvider
+    private val dispatcher: DispatcherProvider,
 ) : UserStageStore {
+
+    override fun userAppStageFlow(): Flow<AppStage> {
+        return userStageDao.currentUserAppStageFlow().map { it?.appStage ?: AppStage.NEW }
+    }
 
     override suspend fun getUserAppStage(): AppStage {
         return withContext(dispatcher.io()) {
@@ -59,6 +66,7 @@ class AppUserStageStore @Inject constructor(
         userStageDao.updateUserStage(appStage)
     }
 
+    override val currentAppStage: Flow<AppStage> = userStageDao.currentAppStage().map { it.appStage }
 }
 
 suspend fun UserStageStore.isNewUser(): Boolean {

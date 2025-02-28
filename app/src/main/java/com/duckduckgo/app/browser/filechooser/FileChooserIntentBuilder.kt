@@ -18,12 +18,16 @@ package com.duckduckgo.app.browser.filechooser
 
 import android.content.Intent
 import android.net.Uri
-import timber.log.Timber
+import java.util.*
 import javax.inject.Inject
+import timber.log.Timber
 
 class FileChooserIntentBuilder @Inject constructor() {
 
-    fun intent(acceptTypes: Array<String>, canChooseMultiple: Boolean = false): Intent {
+    fun intent(
+        acceptTypes: Array<String>,
+        canChooseMultiple: Boolean = false,
+    ): Intent {
         return Intent(Intent.ACTION_GET_CONTENT).also {
             it.flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
             configureSelectableFileTypes(it, acceptTypes)
@@ -46,7 +50,6 @@ class FileChooserIntentBuilder @Inject constructor() {
      *     failing that, we bail.
      */
     fun extractSelectedFileUris(intent: Intent): Array<Uri>? {
-
         // first try to determine if multiple files were selected
         val clipData = intent.clipData
         if (clipData != null && clipData.itemCount > 0) {
@@ -68,14 +71,17 @@ class FileChooserIntentBuilder @Inject constructor() {
         return null
     }
 
-    private fun configureSelectableFileTypes(intent: Intent, acceptTypes: Array<String>) {
+    private fun configureSelectableFileTypes(
+        intent: Intent,
+        acceptTypes: Array<String>,
+    ) {
         intent.type = "*/*"
 
         val acceptedMimeTypes = mutableSetOf<String>()
 
         acceptTypes
             .filter { it.isNotBlank() }
-            .forEach { acceptedMimeTypes.add(it.toLowerCase()) }
+            .forEach { acceptedMimeTypes.add(it.lowercase(Locale.getDefault())) }
 
         if (acceptedMimeTypes.isNotEmpty()) {
             Timber.d("Selectable file types limited to $acceptedMimeTypes")
@@ -85,7 +91,10 @@ class FileChooserIntentBuilder @Inject constructor() {
         }
     }
 
-    private fun configureAllowMultipleFile(intent: Intent, canChooseMultiple: Boolean) {
+    private fun configureAllowMultipleFile(
+        intent: Intent,
+        canChooseMultiple: Boolean,
+    ) {
         intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, canChooseMultiple)
     }
 }

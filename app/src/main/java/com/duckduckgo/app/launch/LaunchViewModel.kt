@@ -17,29 +17,28 @@
 package com.duckduckgo.app.launch
 
 import androidx.lifecycle.ViewModel
-import com.duckduckgo.app.global.SingleLiveEvent
-import com.duckduckgo.app.global.plugins.view_model.ViewModelFactoryPlugin
+import com.duckduckgo.anvil.annotations.ContributesViewModel
 import com.duckduckgo.app.onboarding.store.UserStageStore
 import com.duckduckgo.app.onboarding.store.isNewUser
 import com.duckduckgo.app.referral.AppInstallationReferrerStateListener
 import com.duckduckgo.app.referral.AppInstallationReferrerStateListener.Companion.MAX_REFERRER_WAIT_TIME_MS
-import com.duckduckgo.di.scopes.AppObjectGraph
-import com.squareup.anvil.annotations.ContributesMultibinding
+import com.duckduckgo.common.utils.SingleLiveEvent
+import com.duckduckgo.di.scopes.ActivityScope
+import javax.inject.Inject
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
-import javax.inject.Inject
-import javax.inject.Provider
 
-class LaunchViewModel(
+@ContributesViewModel(ActivityScope::class)
+class LaunchViewModel @Inject constructor(
     private val userStageStore: UserStageStore,
-    private val appReferrerStateListener: AppInstallationReferrerStateListener
+    private val appReferrerStateListener: AppInstallationReferrerStateListener,
 ) :
     ViewModel() {
 
     val command: SingleLiveEvent<Command> = SingleLiveEvent()
 
     sealed class Command {
-        object Onboarding : Command()
+        data object Onboarding : Command()
         data class Home(val replaceExistingSearch: Boolean = false) : Command()
     }
 
@@ -62,20 +61,5 @@ class LaunchViewModel(
         }
 
         Timber.d("Waited ${System.currentTimeMillis() - startTime}ms for referrer")
-    }
-}
-
-@ContributesMultibinding(AppObjectGraph::class)
-class LaunchViewModelFactory @Inject constructor(
-    private val userStageStore: Provider<UserStageStore>,
-    private val appInstallationReferrerStateListener: Provider<AppInstallationReferrerStateListener>
-) : ViewModelFactoryPlugin {
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T? {
-        with(modelClass) {
-            return when {
-                isAssignableFrom(LaunchViewModel::class.java) -> (LaunchViewModel(userStageStore.get(), appInstallationReferrerStateListener.get()) as T)
-                else -> null
-            }
-        }
     }
 }

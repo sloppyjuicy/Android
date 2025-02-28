@@ -47,9 +47,12 @@ interface AppEnjoymentDao {
     @Query("SELECT * from app_enjoyment WHERE eventType = $TYPE_DECLINED_TO_PARTICIPATE AND promptCount = :promptCount")
     fun hasUserDeclinedToSayWhetherEnjoying(promptCount: Int): Boolean
 
-    @Query("SELECT timestamp FROM app_enjoyment WHERE eventType=$TYPE_DECLINED_RATING OR eventType=$TYPE_DECLINED_FEEDBACK OR eventType=$TYPE_DECLINED_TO_PARTICIPATE ORDER BY timestamp DESC LIMIT 1")
+    @Query(
+        "SELECT timestamp FROM app_enjoyment " +
+            "WHERE eventType=$TYPE_DECLINED_RATING OR eventType=$TYPE_DECLINED_FEEDBACK OR eventType=$TYPE_DECLINED_TO_PARTICIPATE " +
+            "ORDER BY timestamp DESC LIMIT 1",
+    )
     fun latestDateUserDeclinedRatingOrFeedback(): Long?
-
 }
 
 @Entity(tableName = "app_enjoyment")
@@ -57,7 +60,7 @@ data class AppEnjoymentEntity(
     val eventType: AppEnjoymentEventType,
     val promptCount: PromptCount,
     val timestamp: Long = System.currentTimeMillis(),
-    @PrimaryKey(autoGenerate = true) val primaryKey: Int = 0
+    @PrimaryKey(autoGenerate = true) val primaryKey: Int = 0,
 )
 
 enum class AppEnjoymentEventType(val value: Int) {
@@ -66,13 +69,13 @@ enum class AppEnjoymentEventType(val value: Int) {
     USER_DECLINED_RATING(TYPE_DECLINED_RATING),
     USER_PROVIDED_FEEDBACK(TYPE_PROVIDED_FEEDBACK),
     USER_DECLINED_FEEDBACK(TYPE_DECLINED_FEEDBACK),
-    USER_DECLINED_TO_SAY_WHETHER_ENJOYING(TYPE_DECLINED_TO_PARTICIPATE);
+    USER_DECLINED_TO_SAY_WHETHER_ENJOYING(TYPE_DECLINED_TO_PARTICIPATE),
+    ;
 
     companion object {
-        private val map = AppEnjoymentEventType.values().associateBy(AppEnjoymentEventType::value)
+        private val map = values().associateBy(AppEnjoymentEventType::value)
         fun fromValue(value: Int) = map[value]
     }
-
 }
 
 class AppEnjoymentTypeConverter {
@@ -82,7 +85,6 @@ class AppEnjoymentTypeConverter {
 
     @TypeConverter
     fun convertFromDb(value: Int): AppEnjoymentEventType? = AppEnjoymentEventType.fromValue(value)
-
 }
 
 class PromptCountConverter {
@@ -92,7 +94,6 @@ class PromptCountConverter {
 
     @TypeConverter
     fun convertFromDb(promptCount: Int): PromptCount = PromptCount(promptCount)
-
 }
 
 class LocationPermissionTypeConverter {
@@ -102,5 +103,4 @@ class LocationPermissionTypeConverter {
 
     @TypeConverter
     fun convertFromDb(value: Int): LocationPermissionType? = LocationPermissionType.fromValue(value)
-
 }

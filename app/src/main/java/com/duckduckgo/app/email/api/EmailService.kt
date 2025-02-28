@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 DuckDuckGo
+ * Copyright (c) 2023 DuckDuckGo
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,12 @@
 
 package com.duckduckgo.app.email.api
 
+import com.duckduckgo.anvil.annotations.ContributesNonCachingServiceApi
+import com.duckduckgo.di.scopes.AppScope
 import retrofit2.http.Header
 import retrofit2.http.POST
 
+@ContributesNonCachingServiceApi(AppScope::class)
 interface EmailService {
     @POST("https://quack.duckduckgo.com/api/email/addresses")
     suspend fun newAlias(@Header("Authorization") authorization: String): EmailAlias

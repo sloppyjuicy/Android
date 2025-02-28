@@ -18,14 +18,13 @@ package com.duckduckgo.app.global.job
 
 import android.content.Context
 import androidx.work.*
-import com.duckduckgo.app.global.plugins.worker.WorkerInjectorPlugin
+import com.duckduckgo.anvil.annotations.ContributesWorker
 import com.duckduckgo.app.job.ConfigurationDownloader
-import com.duckduckgo.di.scopes.AppObjectGraph
-import com.squareup.anvil.annotations.ContributesMultibinding
+import com.duckduckgo.di.scopes.AppScope
 import io.reactivex.Single
-import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import timber.log.Timber
 
 class AppConfigurationSyncWorkRequestBuilder @Inject constructor() {
 
@@ -44,7 +43,11 @@ class AppConfigurationSyncWorkRequestBuilder @Inject constructor() {
     }
 }
 
-class AppConfigurationWorker(context: Context, workerParams: WorkerParameters) : RxWorker(context, workerParams) {
+@ContributesWorker(AppScope::class)
+class AppConfigurationWorker(
+    context: Context,
+    workerParams: WorkerParameters,
+) : RxWorker(context, workerParams) {
 
     @Inject
     lateinit var appConfigurationDownloader: ConfigurationDownloader
@@ -60,19 +63,5 @@ class AppConfigurationWorker(context: Context, workerParams: WorkerParameters) :
                 Timber.w(it, "App configuration sync work failed")
                 Result.retry()
             }
-    }
-}
-
-@ContributesMultibinding(AppObjectGraph::class)
-class AppConfigurationWorkerInjectorPlugin @Inject constructor(
-    private val configurationDownloader: ConfigurationDownloader
-) : WorkerInjectorPlugin {
-
-    override fun inject(worker: ListenableWorker): Boolean {
-        if (worker is AppConfigurationWorker) {
-            worker.appConfigurationDownloader = configurationDownloader
-            return true
-        }
-        return false
     }
 }

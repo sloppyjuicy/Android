@@ -16,23 +16,39 @@
 
 package com.duckduckgo.app.browser
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.WebStorage
 import android.webkit.WebView
 import androidx.test.platform.app.InstrumentationRegistry
+import com.duckduckgo.anrs.api.CrashLogger
 import com.duckduckgo.app.browser.httpauth.WebViewHttpAuthStore
 import com.duckduckgo.app.browser.session.WebViewSessionInMemoryStorage
-import com.duckduckgo.app.fire.DuckDuckGoCookieManager
+import com.duckduckgo.app.browser.weblocalstorage.WebLocalStorageManager
 import com.duckduckgo.app.global.file.FileDeleter
-import com.nhaarman.mockitokotlin2.mock
-import com.nhaarman.mockitokotlin2.verify
+import com.duckduckgo.app.pixels.remoteconfig.AndroidBrowserConfigFeature
+import com.duckduckgo.appbuildconfig.api.AppBuildConfig
+import com.duckduckgo.appbuildconfig.api.BuildFlavor.INTERNAL
+import com.duckduckgo.appbuildconfig.api.BuildFlavor.PLAY
+import com.duckduckgo.common.test.CoroutineTestRule
+import com.duckduckgo.cookies.api.DuckDuckGoCookieManager
+import com.duckduckgo.feature.toggles.api.FakeFeatureToggleFactory
+import com.duckduckgo.feature.toggles.api.Toggle.State
+import java.io.File
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoInteractions
+import org.mockito.kotlin.whenever
 
 @Suppress("RemoveExplicitTypeArguments")
+@SuppressLint("NoHardcodedCoroutineDispatcher")
 class WebViewDataManagerTest {
 
     private val mockCookieManager: DuckDuckGoCookieManager = mock()
@@ -40,10 +56,27 @@ class WebViewDataManagerTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val mockFileDeleter: FileDeleter = mock()
     private val mockWebViewHttpAuthStore: WebViewHttpAuthStore = mock()
-    private val testee = WebViewDataManager(context, WebViewSessionInMemoryStorage(), mockCookieManager, mockFileDeleter, mockWebViewHttpAuthStore)
+    private val mockWebLocalStorageManager: WebLocalStorageManager = mock()
+    private val mockCrashLogger: CrashLogger = mock()
+    private val mockAppBuildConfig: AppBuildConfig = mock()
+    private val feature = FakeFeatureToggleFactory.create(AndroidBrowserConfigFeature::class.java)
+
+    private val testee = WebViewDataManager(
+        context,
+        WebViewSessionInMemoryStorage(),
+        mockCookieManager,
+        mockFileDeleter,
+        mockWebViewHttpAuthStore,
+        feature,
+        mockWebLocalStorageManager,
+        mockCrashLogger,
+        TestScope(),
+        CoroutineTestRule().testDispatcherProvider,
+        mockAppBuildConfig,
+    )
 
     @Test
-    fun whenDataClearedThenWebViewHistoryCleared() = runBlocking<Unit> {
+    fun whenDataClearedThenWebViewHistoryCleared() = runTest {
         withContext(Dispatchers.Main) {
             val webView = TestWebView(context)
             testee.clearData(webView, mockStorage)
@@ -52,7 +85,7 @@ class WebViewDataManagerTest {
     }
 
     @Test
-    fun whenDataClearedThenWebViewCacheCleared() = runBlocking<Unit> {
+    fun whenDataClearedThenWebViewCacheCleared() = runTest {
         withContext(Dispatchers.Main) {
             val webView = TestWebView(context)
             testee.clearData(webView, mockStorage)
@@ -61,7 +94,7 @@ class WebViewDataManagerTest {
     }
 
     @Test
-    fun whenDataClearedThenWebViewFormDataCleared() = runBlocking<Unit> {
+    fun whenDataClearedThenWebViewFormDataCleared() = runTest {
         withContext(Dispatchers.Main) {
             val webView = TestWebView(context)
             testee.clearData(webView, mockStorage)
@@ -69,17 +102,52 @@ class WebViewDataManagerTest {
         }
     }
 
+    @SuppressLint("DenyListedApi")
     @Test
-    fun whenDataClearedThenWebViewWebStorageCleared() = runBlocking<Unit> {
+    fun whenDataClearedThenWebViewWebStorageCleared() = runTest {
         withContext(Dispatchers.Main) {
+            feature.webLocalStorage().setRawStoredState(State(enable = true))
             val webView = TestWebView(context)
             testee.clearData(webView, mockStorage)
+            verify(mockWebLocalStorageManager).clearWebLocalStorage()
+            verify(mockStorage, never()).deleteAllData()
+        }
+    }
+
+    @SuppressLint("DenyListedApi")
+    @Test
+    fun whenDataClearedAndThrowsExceptionAndInternalThenSendCrashPixelAndDeleteAllData() = runTest {
+        withContext(Dispatchers.Main) {
+            feature.webLocalStorage().setRawStoredState(State(enable = true))
+            val exception = RuntimeException("test")
+            val webView = TestWebView(context)
+            whenever(mockAppBuildConfig.flavor).thenReturn(INTERNAL)
+            whenever(mockWebLocalStorageManager.clearWebLocalStorage()).thenThrow(exception)
+            testee.clearData(webView, mockStorage)
+            verify(mockWebLocalStorageManager).clearWebLocalStorage()
+            verify(mockCrashLogger).logCrash(CrashLogger.Crash(shortName = "web_storage_on_clear_error", t = exception))
+            verify(mockStorage).deleteAllData()
+        }
+    }
+
+    @SuppressLint("DenyListedApi")
+    @Test
+    fun whenDataClearedAndThrowsExceptionAndNotInternalThenDoNotSendCrashPixelAndDeleteAllData() = runTest {
+        withContext(Dispatchers.Main) {
+            feature.webLocalStorage().setRawStoredState(State(enable = true))
+            val exception = RuntimeException("test")
+            val webView = TestWebView(context)
+            whenever(mockAppBuildConfig.flavor).thenReturn(PLAY)
+            whenever(mockWebLocalStorageManager.clearWebLocalStorage()).thenThrow(exception)
+            testee.clearData(webView, mockStorage)
+            verify(mockWebLocalStorageManager).clearWebLocalStorage()
+            verifyNoInteractions(mockCrashLogger)
             verify(mockStorage).deleteAllData()
         }
     }
 
     @Test
-    fun whenDataClearedThenWebViewAuthCredentialsCleared() = runBlocking<Unit> {
+    fun whenDataClearedThenWebViewAuthCredentialsCleared() = runTest {
         withContext(Dispatchers.Main) {
             val webView = TestWebView(context)
             testee.clearData(webView, mockStorage)
@@ -88,7 +156,7 @@ class WebViewDataManagerTest {
     }
 
     @Test
-    fun whenDataClearedThenHttpAuthDatabaseCleaned() = runBlocking<Unit> {
+    fun whenDataClearedThenHttpAuthDatabaseCleaned() = runTest {
         withContext(Dispatchers.Main) {
             val webView = TestWebView(context)
             testee.clearData(webView, mockStorage)
@@ -97,11 +165,59 @@ class WebViewDataManagerTest {
     }
 
     @Test
-    fun whenDataClearedThenWebViewCookiesRemoved() = runBlocking<Unit> {
+    fun whenDataClearedThenWebViewCookiesRemoved() = runTest {
         withContext(Dispatchers.Main) {
             val webView = TestWebView(context)
             testee.clearData(webView, mockStorage)
             verify(mockCookieManager).removeExternalCookies()
+        }
+    }
+
+    @Test
+    fun whenClearDataThenAppWebviewContentsDeletedExceptDefaultAndCookies() = runTest {
+        withContext(Dispatchers.Main) {
+            val webView = TestWebView(context)
+
+            testee.clearData(webView, mockStorage)
+
+            verify(mockFileDeleter).deleteContents(
+                File(context.applicationInfo.dataDir, "app_webview"),
+                listOf("Default", "Cookies"),
+            )
+        }
+    }
+
+    @SuppressLint("DenyListedApi")
+    @Test
+    fun whenClearDataAndWebLocalStorageFeatureDisabledThenDefaultContentsDeletedExceptCookies() = runTest {
+        withContext(Dispatchers.Main) {
+            feature.webLocalStorage().setRawStoredState(State(enable = false))
+            val webView = TestWebView(context)
+
+            testee.clearData(webView, mockStorage)
+
+            verify(mockFileDeleter).deleteContents(
+                File(context.applicationInfo.dataDir, "app_webview/Default"),
+                listOf("Cookies"),
+            )
+            verifyNoInteractions(mockWebLocalStorageManager)
+        }
+    }
+
+    @SuppressLint("DenyListedApi")
+    @Test
+    fun whenClearDataAndWebLocalStorageFeatureEnabledThenDefaultContentsDeletedExceptCookiesAndLocalStorage() = runTest {
+        withContext(Dispatchers.Main) {
+            feature.webLocalStorage().setRawStoredState(State(enable = true))
+            val webView = TestWebView(context)
+
+            testee.clearData(webView, mockStorage)
+
+            verify(mockFileDeleter).deleteContents(
+                File(context.applicationInfo.dataDir, "app_webview/Default"),
+                listOf("Cookies", "Local Storage"),
+            )
+            verify(mockWebLocalStorageManager).clearWebLocalStorage()
         }
     }
 

@@ -16,14 +16,14 @@
 
 package com.duckduckgo.app.browser.cookies.db
 
-import com.duckduckgo.app.global.DispatcherProvider
-import com.duckduckgo.app.global.UriString
-import kotlinx.coroutines.withContext
+import com.duckduckgo.app.browser.UriString
+import com.duckduckgo.common.utils.DispatcherProvider
 import javax.inject.Inject
+import kotlinx.coroutines.withContext
 
 class AuthCookiesAllowedDomainsRepository @Inject constructor(
     private val authCookiesAllowedDomainsDao: AuthCookiesAllowedDomainsDao,
-    private val dispatcherProvider: DispatcherProvider
+    private val dispatcherProvider: DispatcherProvider,
 ) {
 
     suspend fun addDomain(domain: String): Long? {

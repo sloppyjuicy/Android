@@ -18,56 +18,69 @@ package com.duckduckgo.app.global.view
 
 import android.animation.Animator
 import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.provider.Settings.Global.ANIMATOR_DURATION_SCALE
-import androidx.core.content.ContextCompat
-import androidx.core.view.doOnDetach
-import androidx.core.view.isVisible
+import android.view.LayoutInflater
+import android.view.View
+import android.view.WindowManager
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat.Type
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.updatePadding
 import com.airbnb.lottie.RenderMode
-import com.duckduckgo.app.browser.R
-import com.duckduckgo.app.cta.ui.CtaViewModel
-import com.duckduckgo.app.cta.ui.DaxFireDialogCta
+import com.duckduckgo.app.browser.databinding.SheetFireClearDataBinding
+import com.duckduckgo.app.firebutton.FireButtonStore
 import com.duckduckgo.app.global.events.db.UserEventKey
 import com.duckduckgo.app.global.events.db.UserEventsStore
 import com.duckduckgo.app.global.view.FireDialog.FireDialogClearAllEvent.AnimationFinished
 import com.duckduckgo.app.global.view.FireDialog.FireDialogClearAllEvent.ClearAllDataFinished
+import com.duckduckgo.app.pixels.AppPixelName.FIRE_DIALOG_ANIMATION
+import com.duckduckgo.app.pixels.AppPixelName.FIRE_DIALOG_CLEAR_PRESSED
 import com.duckduckgo.app.settings.clear.getPixelValue
 import com.duckduckgo.app.settings.db.SettingsDataStore
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.duckduckgo.app.pixels.AppPixelName.*
 import com.duckduckgo.app.statistics.pixels.Pixel.PixelParameter.FIRE_ANIMATION
+import com.duckduckgo.appbuildconfig.api.AppBuildConfig
+import com.duckduckgo.common.ui.view.gone
+import com.duckduckgo.common.ui.view.setAndPropagateUpFitsSystemWindows
+import com.duckduckgo.common.ui.view.show
+import com.duckduckgo.common.utils.DispatcherProvider
+import com.duckduckgo.mobile.android.R as CommonR
+import com.google.android.material.R as MaterialR
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
-import kotlinx.android.synthetic.main.include_dax_dialog_cta.*
-import kotlinx.android.synthetic.main.sheet_fire_clear_data.*
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
 private const val ANIMATION_MAX_SPEED = 1.4f
 private const val ANIMATION_SPEED_INCREMENT = 0.15f
 
+@SuppressLint("NoBottomSheetDialog")
 class FireDialog(
     context: Context,
-    private val ctaViewModel: CtaViewModel,
     private val clearPersonalDataAction: ClearDataAction,
     private val pixel: Pixel,
     private val settingsDataStore: SettingsDataStore,
-    private val userEventsStore: UserEventsStore
-) : BottomSheetDialog(context, R.style.FireDialog), CoroutineScope by MainScope() {
+    private val userEventsStore: UserEventsStore,
+    private val appCoroutineScope: CoroutineScope,
+    private val dispatcherProvider: DispatcherProvider,
+    private val fireButtonStore: FireButtonStore,
+    private val appBuildConfig: AppBuildConfig,
+) : BottomSheetDialog(context, CommonR.style.Widget_DuckDuckGo_FireDialog) {
+
+    private lateinit var binding: SheetFireClearDataBinding
 
     var clearStarted: (() -> Unit) = {}
-    val ctaVisible: Boolean
-        get() = daxCtaContainer?.isVisible == true
 
     private val accelerateAnimatorUpdateListener = object : ValueAnimator.AnimatorUpdateListener {
-        override fun onAnimationUpdate(animation: ValueAnimator?) {
-            fireAnimationView.speed += ANIMATION_SPEED_INCREMENT
-            if (fireAnimationView.speed > ANIMATION_MAX_SPEED) {
-                fireAnimationView.removeUpdateListener(this)
+        override fun onAnimationUpdate(animation: ValueAnimator) {
+            binding.fireAnimationView.speed += ANIMATION_SPEED_INCREMENT
+            if (binding.fireAnimationView.speed > ANIMATION_MAX_SPEED) {
+                binding.fireAnimationView.removeUpdateListener(this)
             }
         }
     }
@@ -75,23 +88,29 @@ class FireDialog(
     private var onClearDataOptionsDismissed: () -> Unit = {}
 
     init {
-        setContentView(R.layout.sheet_fire_clear_data)
+        val inflater = LayoutInflater.from(context)
+        binding = SheetFireClearDataBinding.inflate(inflater)
+        setContentView(binding.root)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        launch {
-            ctaViewModel.getFireDialogCta()?.let {
-                configureFireDialogCta(it)
-            }
-        }
-        clearAllOption.setOnClickListener {
+        binding.clearAllOption.setOnClickListener {
             onClearOptionClicked()
         }
-        cancelOption.setOnClickListener {
+        binding.cancelOption.setOnClickListener {
             cancel()
         }
+
+        if (appBuildConfig.sdkInt == Build.VERSION_CODES.O) {
+            window?.navigationBarColor = context.resources.getColor(CommonR.color.translucentDark, null)
+        } else if (appBuildConfig.sdkInt > Build.VERSION_CODES.O && appBuildConfig.sdkInt < Build.VERSION_CODES.R) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+        }
+
+        removeTopPadding()
+        addBottomPaddingToButtons()
 
         if (animationEnabled()) {
             configureFireAnimationView()
@@ -99,41 +118,49 @@ class FireDialog(
         behavior.state = BottomSheetBehavior.STATE_EXPANDED
     }
 
+    private fun removeTopPadding() {
+        findViewById<View>(MaterialR.id.design_bottom_sheet)?.apply {
+            ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
+                view.updatePadding(top = 0)
+                insets
+            }
+        }
+    }
+
+    private fun addBottomPaddingToButtons() {
+        binding.fireDialogRootView.apply {
+            ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
+                view.updatePadding(bottom = insets.getInsets(Type.systemBars()).bottom)
+                insets
+            }
+        }
+    }
+
     private fun configureFireAnimationView() {
-        fireAnimationView.setAnimation(settingsDataStore.selectedFireAnimation.resId)
+        binding.fireAnimationView.setAnimation(settingsDataStore.selectedFireAnimation.resId)
         /**
          * BottomSheetDialog wraps provided Layout into a CoordinatorLayout.
          * We need to set FitsSystemWindows false programmatically to all parents in order to render layout and animation full screen
          */
-        fireAnimationView.setAndPropagateUpFitsSystemWindows(false)
-        fireAnimationView.setRenderMode(RenderMode.SOFTWARE)
-        fireAnimationView.enableMergePathsForKitKatAndAbove(true)
-    }
-
-    private fun configureFireDialogCta(cta: DaxFireDialogCta) {
-        fireCtaViewStub.inflate()
-        cta.showCta(daxCtaContainer)
-        ctaViewModel.onCtaShown(cta)
-        onClearDataOptionsDismissed = {
-            GlobalScope.launch {
-                ctaViewModel.onUserDismissedCta(cta)
-            }
-        }
-        daxCtaContainer.doOnDetach {
-            onClearDataOptionsDismissed()
-        }
+        binding.fireAnimationView.setAndPropagateUpFitsSystemWindows(false)
+        binding.fireAnimationView.setRenderMode(RenderMode.SOFTWARE)
+        binding.fireAnimationView.enableMergePathsForKitKatAndAbove(true)
     }
 
     private fun onClearOptionClicked() {
-        pixel.enqueueFire(if (ctaVisible) FIRE_DIALOG_PROMOTED_CLEAR_PRESSED else FIRE_DIALOG_CLEAR_PRESSED)
-        pixel.enqueueFire(pixel = FIRE_DIALOG_ANIMATION, parameters = mapOf(FIRE_ANIMATION to settingsDataStore.selectedFireAnimation.getPixelValue()))
+        pixel.enqueueFire(FIRE_DIALOG_CLEAR_PRESSED)
+        pixel.enqueueFire(
+            pixel = FIRE_DIALOG_ANIMATION,
+            parameters = mapOf(FIRE_ANIMATION to settingsDataStore.selectedFireAnimation.getPixelValue()),
+        )
         hideClearDataOptions()
         if (animationEnabled()) {
             playAnimation()
         }
         clearStarted()
 
-        GlobalScope.launch {
+        appCoroutineScope.launch(dispatcherProvider.io()) {
+            fireButtonStore.incrementFireButtonUseCount()
             userEventsStore.registerUserEvent(UserEventKey.FIRE_BUTTON_EXECUTED)
             clearPersonalDataAction.clearTabsAndAllDataAsync(appInForeground = true, shouldFireDataClearPixel = true)
             clearPersonalDataAction.setAppUsedSinceLastClearFlag(false)
@@ -149,23 +176,30 @@ class FireDialog(
     }
 
     private fun playAnimation() {
-        window?.navigationBarColor = ContextCompat.getColor(context, R.color.black)
+        window?.apply {
+            WindowInsetsControllerCompat(this, binding.root).apply {
+                isAppearanceLightStatusBars = false
+                isAppearanceLightNavigationBars = false
+            }
+        }
         setCancelable(false)
         setCanceledOnTouchOutside(false)
-        fireAnimationView.show()
-        fireAnimationView.playAnimation()
-        fireAnimationView.addAnimatorListener(object : Animator.AnimatorListener {
-            override fun onAnimationRepeat(animation: Animator?) {}
-            override fun onAnimationCancel(animation: Animator?) {}
-            override fun onAnimationStart(animation: Animator?) {}
-            override fun onAnimationEnd(animation: Animator?) {
-                onFireDialogClearAllEvent(AnimationFinished)
-            }
-        })
+        binding.fireAnimationView.show()
+        binding.fireAnimationView.playAnimation()
+        binding.fireAnimationView.addAnimatorListener(
+            object : Animator.AnimatorListener {
+                override fun onAnimationRepeat(animation: Animator) {}
+                override fun onAnimationCancel(animation: Animator) {}
+                override fun onAnimationStart(animation: Animator) {}
+                override fun onAnimationEnd(animation: Animator) {
+                    onFireDialogClearAllEvent(AnimationFinished)
+                }
+            },
+        )
     }
 
     private fun hideClearDataOptions() {
-        fireDialogRootView.gone()
+        binding.fireDialogRootView.gone()
         onClearDataOptionsDismissed()
         /*
          * Avoid calling callback twice when view is detached.
@@ -179,15 +213,15 @@ class FireDialog(
         if (!canRestart) {
             canRestart = true
             if (event is ClearAllDataFinished) {
-                fireAnimationView.addAnimatorUpdateListener(accelerateAnimatorUpdateListener)
+                binding.fireAnimationView.addAnimatorUpdateListener(accelerateAnimatorUpdateListener)
             }
         } else {
-            clearPersonalDataAction.killAndRestartProcess(notifyDataCleared = false)
+            clearPersonalDataAction.killAndRestartProcess(notifyDataCleared = false, enableTransitionAnimation = false)
         }
     }
 
     private sealed class FireDialogClearAllEvent {
-        object AnimationFinished : FireDialogClearAllEvent()
-        object ClearAllDataFinished : FireDialogClearAllEvent()
+        data object AnimationFinished : FireDialogClearAllEvent()
+        data object ClearAllDataFinished : FireDialogClearAllEvent()
     }
 }

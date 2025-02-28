@@ -18,12 +18,18 @@ package com.duckduckgo.app.surrogates
 
 import androidx.test.platform.app.InstrumentationRegistry
 import com.duckduckgo.app.surrogates.store.ResourceSurrogateDataStore
-import org.junit.Assert
+import com.duckduckgo.common.test.CoroutineTestRule
+import kotlinx.coroutines.test.TestScope
 import org.junit.Assert.assertEquals
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 
 class ResourceSurrogateLoaderTest {
+
+    @get:Rule
+    @Suppress("unused")
+    val coroutineRule = CoroutineTestRule()
 
     private lateinit var testee: ResourceSurrogateLoader
     private lateinit var dataStore: ResourceSurrogateDataStore
@@ -33,19 +39,19 @@ class ResourceSurrogateLoaderTest {
     fun setup() {
         resourceSurrogates = ResourceSurrogatesImpl()
         dataStore = ResourceSurrogateDataStore(InstrumentationRegistry.getInstrumentation().targetContext)
-        testee = ResourceSurrogateLoader(resourceSurrogates, dataStore)
+        testee = ResourceSurrogateLoader(TestScope(), resourceSurrogates, dataStore, coroutineRule.testDispatcherProvider)
     }
 
     @Test
     fun whenLoading6SurrogatesThen6SurrogatesFound() {
         val surrogates = initialiseFile("surrogates_6")
-        Assert.assertEquals(6, surrogates.size)
+        assertEquals(6, surrogates.size)
     }
 
     @Test
     fun whenLoading1SurrogateThen1SurrogateFound() {
         val surrogates = initialiseFile("surrogates_1")
-        Assert.assertEquals(1, surrogates.size)
+        assertEquals(1, surrogates.size)
     }
 
     @Test
@@ -123,5 +129,4 @@ class ResourceSurrogateLoaderTest {
     private fun readFile(filename: String): ByteArray {
         return javaClass.classLoader!!.getResource("binary/surrogates/$filename").readBytes()
     }
-
 }

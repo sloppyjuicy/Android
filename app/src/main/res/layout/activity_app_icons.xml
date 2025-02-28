@@ -14,14 +14,20 @@
   ~ limitations under the License.
   -->
 
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context="com.duckduckgo.app.privacy.ui.TrackerNetworksActivity">
+<LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
 
-    <include layout="@layout/include_toolbar" />
+    <include
+            android:id="@+id/includeToolbar"
+            layout="@layout/include_default_toolbar"/>
 
-    <include layout="@layout/content_app_icons" />
+    <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/appIconsList"
+            android:padding="@dimen/keyline_4"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>

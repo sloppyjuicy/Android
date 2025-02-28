@@ -14,18 +14,25 @@
  * limitations under the License.
  */
 
+apply from: "$rootDir/code-formatting.gradle"
+
 android {
     compileSdkVersion compile_sdk
-    buildToolsVersion tools_build_version
 
     defaultConfig {
-        minSdkVersion min_sdk
-        targetSdkVersion target_sdk
+        minSdk min_sdk
+        targetSdk target_sdk
         versionCode 1
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
+        vectorDrawables.useSupportLibrary = true
+    }
+
+    lint {
+        abortOnError true
+        ignoreTestSources false
     }
 
     buildTypes {
@@ -35,10 +42,36 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = '1.8'
+    kotlin {
+        jvmToolchain(17)
     }
+    buildFeatures {
+        viewBinding = true
+    }
+}
+dependencies {
+    lintChecks project(':lint-rules')
+}
+
+tasks.register('checks') {
+    dependsOn 'jvm_checks', 'android_checks'
+}
+
+tasks.register('android_checks') {
+    dependsOn 'connectedDebugAndroidTest'
+}
+
+tasks.register('jvm_checks') {
+    dependsOn 'spotlessCheck', 'lint', 'testDebugUnitTest'
+}
+
+tasks.register('jvm_tests') {
+    dependsOn 'testDebugUnitTest'
+}
+
+tasks.register('lint_check') {
+    dependsOn 'lint'
 }

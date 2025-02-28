@@ -14,79 +14,68 @@
   ~ limitations under the License.
   -->
 
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/settingsSectionPrivacy"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content">
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
 
-    <TextView
+    <com.duckduckgo.common.ui.view.listitem.SectionHeaderListItem
         android:id="@+id/settingsPrivacyTitle"
-        style="@style/SettingsSectionTitle"
-        android:text="@string/settingsHeadingPrivacy"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"/>
-
-    <com.duckduckgo.app.settings.SettingsOptionWithSubtitle
-        android:id="@+id/globalPrivacyControlSetting"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:subtitle="test test test"
-        app:title="@string/globalPrivacyControlSetting"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/settingsPrivacyTitle" />
+        app:primaryText="@string/settingsHeadingPrivacy" />
 
-    <TextView
-        android:id="@+id/fireproofWebsites"
-        style="@style/SettingsItemClickable"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:text="@string/settingsFireproofWebsites"
-        app:layout_constraintTop_toBottomOf="@id/globalPrivacyControlSetting" />
-
-    <TextView
-        android:id="@+id/locationPermissions"
-        style="@style/SettingsItemClickable"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:text="@string/settingsPreciseLocation"
-        app:layout_constraintTop_toBottomOf="@id/fireproofWebsites" />
-
-    <com.duckduckgo.app.settings.SettingsOptionWithSubtitle
-        android:id="@+id/automaticallyClearWhatSetting"
+    <com.duckduckgo.common.ui.view.listitem.CheckListItem
+        android:id="@+id/setAsDefaultBrowserSetting"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/locationPermissions"
-        app:subtitle="test test test"
-        app:title="@string/settingsAutomaticallyClearWhat" />
+        app:primaryText="@string/settingsDefaultBrowserTitle"
+        app:secondaryText="@string/settingsDefaultBrowserNotSetDescription"/>
 
-    <com.duckduckgo.app.settings.SettingsOptionWithSubtitle
-        android:id="@+id/automaticallyClearWhenSetting"
+    <com.duckduckgo.common.ui.view.listitem.CheckListItem
+        android:id="@+id/privateSearchSetting"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/automaticallyClearWhatSetting"
-        app:subtitle="test test test"
-        app:title="@string/settingsAutomaticallyClearWhen" />
+        app:itemState="enabled"
+        app:primaryText="@string/settingsPrivateSearchTitle"
+        app:primaryTextTruncated="false"
+        app:secondaryText="@string/settingsPrivateSearchDescription" />
 
-    <TextView
-        android:id="@+id/whitelist"
-        style="@style/SettingsItemClickable"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:text="@string/settingsPrivacyProtectionWhitelist"
-        app:layout_constraintTop_toBottomOf="@id/automaticallyClearWhenSetting" />
+    <com.duckduckgo.common.ui.view.listitem.CheckListItem
+        android:id="@+id/webTrackingProtectionSetting"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:itemState="enabled"
+        app:primaryText="@string/settingsWebTrackingProtectionTitle"
+        app:primaryTextTruncated="false"
+        app:secondaryText="@string/settingsWebTrackingProtectionDescription" />
 
-    <com.duckduckgo.app.settings.SettingsOptionWithSubtitle
+    <com.duckduckgo.common.ui.view.listitem.CheckListItem
+        android:id="@+id/cookiePopupProtectionSetting"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:itemState="enabled"
+        app:primaryText="@string/cookiePopupProtectionTitle"
+        app:primaryTextTruncated="false"
+        app:secondaryText="@string/cookiePopupProtectionDescription" />
+
+    <com.duckduckgo.common.ui.view.listitem.CheckListItem
+        android:id="@+id/vpnSetting"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:primaryText="@string/atp_SettingsTitle"
+        app:primaryTextTruncated="false"
+        app:secondaryText="@string/atp_SettingsDeviceShieldDisabled" />
+
+    <com.duckduckgo.common.ui.view.listitem.CheckListItem
         android:id="@+id/emailSetting"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:title="@string/settingsEmailAutofill"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/whitelist" />
+        app:primaryText="@string/settingsEmailProtectionTitle"
+        app:primaryTextTruncated="false"
+        app:secondaryText="@string/settingsEmailProtectionSubtitle"
+        app:showBetaPill="true" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</LinearLayout>

@@ -17,12 +17,12 @@
 package com.duckduckgo.app.browser.certificates.rootstore
 
 import android.net.http.SslCertificate
-import com.duckduckgo.app.browser.certificates.toX509Certificate
 import com.duckduckgo.app.browser.certificates.CertificateType
 import com.duckduckgo.app.browser.certificates.CertificateTypes
 import com.duckduckgo.app.browser.certificates.LetsEncryptCertificateProvider
-import timber.log.Timber
+import com.duckduckgo.app.browser.certificates.toX509Certificate
 import java.security.cert.*
+import timber.log.Timber
 
 interface TrustedCertificateStore {
     fun validateSslCertificateChain(sslCertificate: SslCertificate): CertificateValidationState
@@ -36,7 +36,7 @@ sealed class CertificateValidationState {
 }
 
 class TrustedCertificateStoreImpl(
-    private val letsEncryptCertificateProvider: LetsEncryptCertificateProvider
+    private val letsEncryptCertificateProvider: LetsEncryptCertificateProvider,
 ) : TrustedCertificateStore {
 
     /**
@@ -69,21 +69,24 @@ class TrustedCertificateStoreImpl(
             validate(sslCertificate.toX509Certificate(), it.certificate())
             // then check if root
             if (it.type() == CertificateType.Root) {
-                Timber.d("Certificate Trusted anchor validated!")
+                Timber.d("SSLShield: Certificate Trusted anchor validated!")
                 return
             }
-            Timber.d("Intermediate certificate validated!")
+            Timber.d("SSLShield: Intermediate certificate validated!")
             validateSslCertificateChainInternal(SslCertificate(it.certificate() as X509Certificate))
 
             // certificate chain validated
             return
         }
 
-        throw CertificateException("Unable to find certificate trusted anchor")
+        throw CertificateException("SSLShield: Unable to find certificate trusted anchor")
     }
 
     @Throws(CertificateExpiredException::class, CertificateNotYetValidException::class)
-    private fun validate(cert: Certificate, issuerCertificate: Certificate) {
+    private fun validate(
+        cert: Certificate,
+        issuerCertificate: Certificate,
+    ) {
         if (issuerCertificate.type == CertificateTypes.X509) {
             (issuerCertificate as X509Certificate).checkValidity()
         }

@@ -16,40 +16,36 @@
 
 package com.duckduckgo.app.di
 
-import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.work.WorkManager
+import com.duckduckgo.app.notification.*
 import com.duckduckgo.app.notification.AndroidNotificationScheduler
-import com.duckduckgo.app.notification.NotificationFactory
 import com.duckduckgo.app.notification.NotificationScheduler
 import com.duckduckgo.app.notification.db.NotificationDao
 import com.duckduckgo.app.notification.model.ClearDataNotification
 import com.duckduckgo.app.notification.model.PrivacyProtectionNotification
+import com.duckduckgo.app.notification.model.SchedulableNotificationPlugin
 import com.duckduckgo.app.privacy.db.PrivacyProtectionCountDao
 import com.duckduckgo.app.settings.db.SettingsDataStore
+import com.duckduckgo.common.utils.plugins.PluginPoint
+import com.duckduckgo.di.scopes.AppScope
 import dagger.Module
 import dagger.Provides
-import javax.inject.Singleton
+import dagger.SingleInstanceIn
 
 @Module(includes = [DaoModule::class])
-class NotificationModule {
+object NotificationModule {
 
     @Provides
-    @Singleton
-    fun provideNotificationManager(context: Context): NotificationManager {
-        return context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    }
-
-    @Provides
-    @Singleton
+    @SingleInstanceIn(AppScope::class)
     fun provideNotificationManagerCompat(context: Context): NotificationManagerCompat {
         return NotificationManagerCompat.from(context)
     }
 
     @Provides
-    @Singleton
+    @SingleInstanceIn(AppScope::class)
     fun provideLocalBroadcastManager(context: Context): LocalBroadcastManager {
         return LocalBroadcastManager.getInstance(context)
     }
@@ -58,7 +54,7 @@ class NotificationModule {
     fun provideClearDataNotification(
         context: Context,
         notificationDao: NotificationDao,
-        settingsDataStore: SettingsDataStore
+        settingsDataStore: SettingsDataStore,
     ): ClearDataNotification {
         return ClearDataNotification(context, notificationDao, settingsDataStore)
     }
@@ -67,28 +63,45 @@ class NotificationModule {
     fun providePrivacyProtectionNotification(
         context: Context,
         notificationDao: NotificationDao,
-        privacyProtectionCountDao: PrivacyProtectionCountDao
+        privacyProtectionCountDao: PrivacyProtectionCountDao,
     ): PrivacyProtectionNotification {
         return PrivacyProtectionNotification(context, notificationDao, privacyProtectionCountDao)
     }
 
     @Provides
-    @Singleton
+    @SingleInstanceIn(AppScope::class)
     fun providesNotificationScheduler(
         workManager: WorkManager,
+        notificationManager: NotificationManagerCompat,
         clearDataNotification: ClearDataNotification,
-        privacyProtectionNotification: PrivacyProtectionNotification
+        privacyProtectionNotification: PrivacyProtectionNotification,
     ): AndroidNotificationScheduler {
         return NotificationScheduler(
             workManager,
+            notificationManager,
             clearDataNotification,
-            privacyProtectionNotification
+            privacyProtectionNotification,
         )
     }
 
     @Provides
-    @Singleton
-    fun providesNotificationFactory(context: Context, manager: NotificationManagerCompat): NotificationFactory {
+    @SingleInstanceIn(AppScope::class)
+    fun providesNotificationFactory(
+        context: Context,
+        manager: NotificationManagerCompat,
+    ): NotificationFactory {
         return NotificationFactory(context, manager)
+    }
+
+    @Provides
+    @SingleInstanceIn(AppScope::class)
+    fun providesNotificationSender(
+        context: Context,
+        manager: NotificationManagerCompat,
+        factory: NotificationFactory,
+        notificationDao: NotificationDao,
+        pluginPoint: PluginPoint<SchedulableNotificationPlugin>,
+    ): NotificationSender {
+        return AppNotificationSender(context, manager, factory, notificationDao, pluginPoint)
     }
 }

@@ -16,32 +16,44 @@
 
 package com.duckduckgo.app.trackerdetection
 
+import android.net.Uri
+
 interface Client {
 
     enum class ClientType {
         BLOCKING,
-        WHITELIST
+        ALLOWLIST,
     }
 
     enum class ClientName(val type: ClientType) {
         // current clients
         TDS(ClientType.BLOCKING),
-        TEMPORARY_WHITELIST(ClientType.WHITELIST),
 
         // legacy clients
         EASYLIST(ClientType.BLOCKING),
         EASYPRIVACY(ClientType.BLOCKING),
-        TRACKERSWHITELIST(ClientType.WHITELIST)
+        TRACKERSALLOWLIST(ClientType.ALLOWLIST),
     }
 
     data class Result(
         val matches: Boolean,
         val entityName: String? = null,
         val categories: List<String>? = null,
-        val surrogate: String? = null
+        val surrogate: String? = null,
+        val isATracker: Boolean,
     )
 
     val name: ClientName
 
-    fun matches(url: String, documentUrl: String): Result
+    fun matches(
+        url: String,
+        documentUrl: Uri,
+        requestHeaders: Map<String, String>,
+    ): Result
+
+    fun matches(
+        url: Uri,
+        documentUrl: Uri,
+        requestHeaders: Map<String, String>,
+    ): Result
 }

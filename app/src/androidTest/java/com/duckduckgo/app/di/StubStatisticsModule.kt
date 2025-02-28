@@ -17,27 +17,36 @@
 package com.duckduckgo.app.di
 
 import android.content.Context
-import com.duckduckgo.app.global.device.ContextDeviceInfo
-import com.duckduckgo.app.global.device.DeviceInfo
+import com.duckduckgo.app.lifecycle.MainProcessLifecycleObserver
 import com.duckduckgo.app.statistics.AtbInitializer
 import com.duckduckgo.app.statistics.AtbInitializerListener
 import com.duckduckgo.app.statistics.api.PixelSender
+import com.duckduckgo.app.statistics.api.PixelSender.SendPixelResult
+import com.duckduckgo.app.statistics.api.PixelSender.SendPixelResult.PIXEL_SENT
 import com.duckduckgo.app.statistics.api.StatisticsService
 import com.duckduckgo.app.statistics.api.StatisticsUpdater
 import com.duckduckgo.app.statistics.pixels.Pixel
+import com.duckduckgo.app.statistics.pixels.Pixel.PixelType
 import com.duckduckgo.app.statistics.store.StatisticsDataStore
-import com.duckduckgo.di.scopes.AppObjectGraph
+import com.duckduckgo.common.utils.DispatcherProvider
+import com.duckduckgo.common.utils.device.ContextDeviceInfo
+import com.duckduckgo.common.utils.device.DeviceInfo
+import com.duckduckgo.common.utils.plugins.PluginPoint
+import com.duckduckgo.di.scopes.AppScope
 import com.squareup.anvil.annotations.ContributesTo
 import dagger.Module
 import dagger.Provides
+import dagger.SingleInstanceIn
+import dagger.multibindings.IntoSet
 import io.reactivex.Completable
+import io.reactivex.Single
+import kotlinx.coroutines.CoroutineScope
 import retrofit2.Retrofit
-import javax.inject.Singleton
 
 @Module
 @ContributesTo(
-    scope = AppObjectGraph::class,
-    replaces = [StatisticsModule::class]
+    scope = AppScope::class,
+    replaces = [StatisticsModule::class],
 )
 class StubStatisticsModule {
 
@@ -57,7 +66,6 @@ class StubStatisticsModule {
 
             override fun refreshSearchRetentionAtb() {
             }
-
         }
     }
 
@@ -65,19 +73,34 @@ class StubStatisticsModule {
     fun stubPixel(): Pixel {
         return object : Pixel {
 
-            override fun fire(pixel: Pixel.PixelName, parameters: Map<String, String>, encodedParameters: Map<String, String>) {
+            override fun fire(
+                pixel: Pixel.PixelName,
+                parameters: Map<String, String>,
+                encodedParameters: Map<String, String>,
+                type: PixelType,
+            ) {
             }
 
-            override fun fire(pixelName: String, parameters: Map<String, String>, encodedParameters: Map<String, String>) {
-
+            override fun fire(
+                pixelName: String,
+                parameters: Map<String, String>,
+                encodedParameters: Map<String, String>,
+                type: PixelType,
+            ) {
             }
 
-            override fun enqueueFire(pixel: Pixel.PixelName, parameters: Map<String, String>, encodedParameters: Map<String, String>) {
-
+            override fun enqueueFire(
+                pixel: Pixel.PixelName,
+                parameters: Map<String, String>,
+                encodedParameters: Map<String, String>,
+            ) {
             }
 
-            override fun enqueueFire(pixelName: String, parameters: Map<String, String>, encodedParameters: Map<String, String>) {
-
+            override fun enqueueFire(
+                pixelName: String,
+                parameters: Map<String, String>,
+                encodedParameters: Map<String, String>,
+            ) {
             }
         }
     }
@@ -86,26 +109,37 @@ class StubStatisticsModule {
     fun deviceInfo(context: Context): DeviceInfo = ContextDeviceInfo(context)
 
     @Provides
-    @Singleton
+    @IntoSet
+    @SingleInstanceIn(AppScope::class)
     fun atbInitializer(
+        @AppCoroutineScope appCoroutineScope: CoroutineScope,
         statisticsDataStore: StatisticsDataStore,
         statisticsUpdater: StatisticsUpdater,
-        listeners: Set<@JvmSuppressWildcards AtbInitializerListener>
-    ): AtbInitializer {
-        return AtbInitializer(statisticsDataStore, statisticsUpdater, listeners)
+        listeners: PluginPoint<AtbInitializerListener>,
+        dispatcherProvider: DispatcherProvider,
+    ): MainProcessLifecycleObserver {
+        return AtbInitializer(appCoroutineScope, statisticsDataStore, statisticsUpdater, listeners, dispatcherProvider)
     }
 
     @Provides
     fun pixelSender(): PixelSender {
         return object : PixelSender {
-            override fun sendPixel(pixelName: String, parameters: Map<String, String>, encodedParameters: Map<String, String>): Completable {
-                return Completable.fromAction {}
+            override fun sendPixel(
+                pixelName: String,
+                parameters: Map<String, String>,
+                encodedParameters: Map<String, String>,
+                type: PixelType,
+            ): Single<SendPixelResult> {
+                return Single.just(PIXEL_SENT)
             }
 
-            override fun enqueuePixel(pixelName: String, parameters: Map<String, String>, encodedParameters: Map<String, String>): Completable {
+            override fun enqueuePixel(
+                pixelName: String,
+                parameters: Map<String, String>,
+                encodedParameters: Map<String, String>,
+            ): Completable {
                 return Completable.fromAction {}
             }
-
         }
     }
 }

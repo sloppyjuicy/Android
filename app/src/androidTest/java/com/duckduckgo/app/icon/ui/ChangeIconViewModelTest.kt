@@ -24,14 +24,15 @@ import com.duckduckgo.app.icon.api.IconModifier
 import com.duckduckgo.app.pixels.AppPixelName
 import com.duckduckgo.app.settings.db.SettingsDataStore
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.nhaarman.mockitokotlin2.mock
-import com.nhaarman.mockitokotlin2.verify
-import com.nhaarman.mockitokotlin2.whenever
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.mockito.Mockito
+import org.mockito.kotlin.any
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 
 class ChangeIconViewModelTest {
 
@@ -79,7 +80,7 @@ class ChangeIconViewModelTest {
         val selectedIconViewData = ChangeIconViewModel.IconViewData(selectedIcon, true)
         testee.onIconSelected(selectedIconViewData)
 
-        verify(mockCommandObserver).onChanged(Mockito.any(ChangeIconViewModel.Command.ShowConfirmationDialog::class.java))
+        verify(mockCommandObserver).onChanged(any<ChangeIconViewModel.Command.ShowConfirmationDialog>())
     }
 
     @Test
@@ -94,7 +95,6 @@ class ChangeIconViewModelTest {
 
         verify(mockAppIconModifier).changeIcon(previousIcon, selectedIcon)
         verify(mockSettingsDataStore).appIcon = selectedIcon
-        verify(mockCommandObserver).onChanged(Mockito.any(ChangeIconViewModel.Command.IconChanged::class.java))
+        verify(mockCommandObserver).onChanged(any<ChangeIconViewModel.Command.IconChanged>())
     }
-
 }

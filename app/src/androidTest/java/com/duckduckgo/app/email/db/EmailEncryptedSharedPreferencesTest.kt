@@ -17,20 +17,18 @@
 package com.duckduckgo.app.email.db
 
 import androidx.test.platform.app.InstrumentationRegistry
-import com.duckduckgo.app.CoroutineTestRule
-import com.duckduckgo.app.runBlocking
 import com.duckduckgo.app.statistics.pixels.Pixel
-import com.nhaarman.mockitokotlin2.mock
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import com.duckduckgo.common.test.CoroutineTestRule
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.first
-import org.junit.Assert.*
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.mockito.kotlin.mock
 
 @FlowPreview
-@ExperimentalCoroutinesApi
 class EmailEncryptedSharedPreferencesTest {
 
     @get:Rule
@@ -45,16 +43,16 @@ class EmailEncryptedSharedPreferencesTest {
     }
 
     @Test
-    fun whenNextAliasEqualsValueThenValueIsSentToNextAliasChannel() = coroutineRule.runBlocking {
+    fun whenNextAliasEqualsValueThenValueIsSentToNextAliasChannel() = runTest {
         testee.nextAlias = "test"
 
-        assertEquals("test", testee.nextAliasFlow().first())
+        assertEquals("test", testee.nextAlias)
     }
 
     @Test
-    fun whenNextAliasEqualsNullThenNullIsSentToNextAliasChannel() = coroutineRule.runBlocking {
+    fun whenNextAliasEqualsNullThenNullIsSentToNextAliasChannel() = runTest {
         testee.nextAlias = null
 
-        assertNull(testee.nextAliasFlow().first())
+        assertNull(testee.nextAlias)
     }
 }

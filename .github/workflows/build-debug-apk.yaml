@@ -1,0 +1,54 @@
+name: Build debug apk
+
+on:
+  pull_request:
+    branches:
+      - develop
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_debug_apk:
+    name: Build debug apk
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK version
+        uses: actions/setup-java@v4
+        with:
+          java-version-file: .github/.java-version
+          distribution: 'adopt'
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.18.3'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Assemble the project
+        env:
+          MALICIOUS_SITE_PROTECTION_AUTH_TOKEN: ${{ secrets.MALICIOUS_SITE_PROTECTION_AUTH_TOKEN }}
+        run: ./gradlew assembleInternalDebug -Pforce-default-variant
+
+      - name: Obtain debug apk
+        if: always()
+        run: cp $(find . -regex '.*outputs/apk/.*internal-debug.apk') pr-ddg-debug.apk
+
+      - name: Upload debug apk
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-ddg-debug
+          path: pr-ddg-debug.apk

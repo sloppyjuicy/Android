@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 DuckDuckGo
+ * Copyright (c) 2024 DuckDuckGo
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,95 +16,124 @@
 
 package com.duckduckgo.app.onboarding.ui.page
 
-import android.app.Activity.RESULT_OK
-import android.content.Context
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
-import android.os.Build
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
-import androidx.core.content.ContextCompat
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.ViewCompat
 import androidx.core.view.ViewPropertyAnimatorCompat
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.transition.AutoTransition
+import androidx.transition.TransitionManager
+import com.duckduckgo.anvil.annotations.InjectWith
 import com.duckduckgo.app.browser.R
-import com.duckduckgo.app.global.view.html
-import dagger.android.support.AndroidSupportInjection
-import kotlinx.android.synthetic.main.content_onboarding_welcome.*
-import kotlinx.android.synthetic.main.include_dax_dialog_cta.*
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.channels.BroadcastChannel
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.launch
+import com.duckduckgo.app.browser.databinding.ContentOnboardingWelcomePageBinding
+import com.duckduckgo.app.onboarding.ui.page.WelcomePage.Companion.PreOnboardingDialogType.ADDRESS_BAR_POSITION
+import com.duckduckgo.app.onboarding.ui.page.WelcomePage.Companion.PreOnboardingDialogType.COMPARISON_CHART
+import com.duckduckgo.app.onboarding.ui.page.WelcomePage.Companion.PreOnboardingDialogType.INITIAL
+import com.duckduckgo.app.onboarding.ui.page.WelcomePageViewModel.Command.Finish
+import com.duckduckgo.app.onboarding.ui.page.WelcomePageViewModel.Command.SetAddressBarPositionOptions
+import com.duckduckgo.app.onboarding.ui.page.WelcomePageViewModel.Command.SetBackgroundResource
+import com.duckduckgo.app.onboarding.ui.page.WelcomePageViewModel.Command.ShowAddressBarPositionDialog
+import com.duckduckgo.app.onboarding.ui.page.WelcomePageViewModel.Command.ShowComparisonChart
+import com.duckduckgo.app.onboarding.ui.page.WelcomePageViewModel.Command.ShowDefaultBrowserDialog
+import com.duckduckgo.app.onboarding.ui.page.WelcomePageViewModel.Command.ShowInitialDialog
+import com.duckduckgo.appbuildconfig.api.AppBuildConfig
+import com.duckduckgo.common.ui.store.AppTheme
+import com.duckduckgo.common.ui.view.gone
+import com.duckduckgo.common.ui.view.show
+import com.duckduckgo.common.ui.viewbinding.viewBinding
+import com.duckduckgo.common.utils.FragmentViewModelFactory
+import com.duckduckgo.common.utils.extensions.html
+import com.duckduckgo.di.scopes.FragmentScope
 import javax.inject.Inject
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 
-@ExperimentalCoroutinesApi
-class WelcomePage : OnboardingPageFragment() {
+@InjectWith(FragmentScope::class)
+class WelcomePage : OnboardingPageFragment(R.layout.content_onboarding_welcome_page) {
 
     @Inject
-    lateinit var viewModelFactory: WelcomePageViewModelFactory
+    lateinit var viewModelFactory: FragmentViewModelFactory
 
-    private var ctaText: String = ""
+    @Inject
+    lateinit var appBuildConfig: AppBuildConfig
+
+    @Inject
+    lateinit var appTheme: AppTheme
+
+    private val binding: ContentOnboardingWelcomePageBinding by viewBinding()
+    private val viewModel by lazy {
+        ViewModelProvider(this, viewModelFactory)[WelcomePageViewModel::class.java]
+    }
+
+    private var hikerAnimation: ViewPropertyAnimatorCompat? = null
     private var welcomeAnimation: ViewPropertyAnimatorCompat? = null
     private var typingAnimation: ViewPropertyAnimatorCompat? = null
     private var welcomeAnimationFinished = false
 
-    // we use a BroadcastChannel because we don't want to emit the last value upon subscription
-    private val events = BroadcastChannel<WelcomePageView.Event>(1)
-
-    private val welcomePageViewModel: WelcomePageViewModel by lazy {
-        ViewModelProvider(this, viewModelFactory).get(WelcomePageViewModel::class.java)
+    private val requestPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { permissionGranted ->
+        if (permissionGranted) {
+            viewModel.notificationRuntimePermissionGranted()
+        }
+        if (view?.windowVisibility == View.VISIBLE) {
+            scheduleWelcomeAnimation(ANIMATION_DELAY_AFTER_NOTIFICATIONS_PERMISSIONS_HANDLED)
+        }
     }
 
-    override fun layoutResource(): Int = R.layout.content_onboarding_welcome
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?,
+    ): View {
+        val binding = ContentOnboardingWelcomePageBinding.inflate(inflater, container, false)
+        viewModel.setBackgroundResource(appTheme.isLightModeEnabled())
+        viewModel.commands.flowWithLifecycle(lifecycle, Lifecycle.State.STARTED).onEach {
+            when (it) {
+                is ShowInitialDialog -> configureDaxCta(INITIAL)
+                is ShowComparisonChart -> configureDaxCta(COMPARISON_CHART)
+                is ShowDefaultBrowserDialog -> showDefaultBrowserDialog(it.intent)
+                is ShowAddressBarPositionDialog -> configureDaxCta(ADDRESS_BAR_POSITION)
+                is Finish -> onContinuePressed()
+                is SetBackgroundResource -> setBackgroundRes(it.backgroundRes)
+                is SetAddressBarPositionOptions -> setAddressBarPositionOptions(it.defaultOption)
+            }
+        }.launchIn(lifecycleScope)
+        return binding.root
+    }
 
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
+    private fun setAddressBarPositionOptions(defaultOption: Boolean) {
+        if (defaultOption) {
+            binding.daxDialogCta.addressBarPosition.option1.setBackgroundResource(R.drawable.background_preonboarding_option_selected)
+            binding.daxDialogCta.addressBarPosition.option1Switch.isChecked = true
+            binding.daxDialogCta.addressBarPosition.option2.setBackgroundResource(R.drawable.background_preonboarding_option)
+            binding.daxDialogCta.addressBarPosition.option2Switch.isChecked = false
+        } else {
+            binding.daxDialogCta.addressBarPosition.option1.setBackgroundResource(R.drawable.background_preonboarding_option)
+            binding.daxDialogCta.addressBarPosition.option1Switch.isChecked = false
+            binding.daxDialogCta.addressBarPosition.option2.setBackgroundResource(R.drawable.background_preonboarding_option_selected)
+            binding.daxDialogCta.addressBarPosition.option2Switch.isChecked = true
+        }
+    }
 
-        configureDaxCta()
-        scheduleWelcomeAnimation()
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
+        super.onViewCreated(view, savedInstanceState)
+        requestNotificationsPermissions()
         setSkipAnimationListener()
-    }
-
-    override fun onAttach(context: Context) {
-        AndroidSupportInjection.inject(this)
-        super.onAttach(context)
-    }
-
-    override fun onStart() {
-        super.onStart()
-
-        lifecycleScope.launch {
-            events.asFlow()
-                .flatMapLatest { welcomePageViewModel.reduce(it) }
-                .collect(::render)
-        }
-    }
-
-    private fun render(state: WelcomePageView.State) {
-        when (state) {
-            WelcomePageView.State.Idle -> {}
-            is WelcomePageView.State.ShowDefaultBrowserDialog -> {
-                showDefaultBrowserDialog(state.intent)
-            }
-            WelcomePageView.State.Finish -> {
-                onContinuePressed()
-            }
-        }
-    }
-
-    private fun event(event: WelcomePageView.Event) {
-        lifecycleScope.launch {
-            events.send(event)
-        }
-    }
-
-    private fun showDefaultBrowserDialog(intent: Intent) {
-        startActivityForResult(intent, DEFAULT_BROWSER_ROLE_MANAGER_DIALOG)
     }
 
     override fun onResume() {
@@ -112,54 +141,132 @@ class WelcomePage : OnboardingPageFragment() {
         applyFullScreenFlags()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
+    override fun onDestroyView() {
+        super.onDestroyView()
         welcomeAnimation?.cancel()
         typingAnimation?.cancel()
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    override fun onActivityResult(
+        requestCode: Int,
+        resultCode: Int,
+        data: Intent?,
+    ) {
         if (requestCode == DEFAULT_BROWSER_ROLE_MANAGER_DIALOG) {
-            if (resultCode == RESULT_OK) {
-                event(WelcomePageView.Event.OnDefaultBrowserSet)
+            if (resultCode == Activity.RESULT_OK) {
+                viewModel.onDefaultBrowserSet()
             } else {
-                event(WelcomePageView.Event.OnDefaultBrowserNotSet)
+                viewModel.onDefaultBrowserNotSet()
             }
         } else {
             super.onActivityResult(requestCode, resultCode, data)
         }
     }
 
-    private fun applyFullScreenFlags() {
-        activity?.window?.apply {
-            clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-            addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            }
-            decorView.systemUiVisibility += View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-            statusBarColor = Color.TRANSPARENT
+    @SuppressLint("InlinedApi")
+    private fun requestNotificationsPermissions() {
+        if (appBuildConfig.sdkInt >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            viewModel.notificationRuntimePermissionRequested()
+            requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            scheduleWelcomeAnimation()
         }
-        ViewCompat.requestApplyInsets(longDescriptionContainer)
     }
 
-    private fun configureDaxCta() {
+    private fun configureDaxCta(onboardingDialogType: PreOnboardingDialogType) {
         context?.let {
-            ctaText = it.getString(R.string.onboardingDaxText)
-            hiddenTextCta.text = ctaText.html(it)
-            dialogTextCta.textInDialog = ctaText.html(it)
-            dialogTextCta.setTextColor(ContextCompat.getColor(it, R.color.grayishBrown))
-            cardView.backgroundTintList = ContextCompat.getColorStateList(it, R.color.white)
+            var afterAnimation: () -> Unit = {}
+            viewModel.onDialogShown(onboardingDialogType)
+            when (onboardingDialogType) {
+                INITIAL -> {
+                    binding.daxDialogCta.root.show()
+                    binding.daxDialogCta.progressBarText.gone()
+                    binding.daxDialogCta.progressBar.gone()
+
+                    val ctaText = it.getString(R.string.highlightsPreOnboardingDaxDialog1Title)
+                    binding.daxDialogCta.hiddenTextCta.text = ctaText.html(it)
+                    binding.daxDialogCta.daxDialogContentImage.gone()
+                    afterAnimation = {
+                        binding.daxDialogCta.dialogTextCta.finishAnimation()
+                        binding.daxDialogCta.primaryCta.text = it.getString(R.string.preOnboardingDaxDialog1Button)
+                        binding.daxDialogCta.primaryCta.setOnClickListener { viewModel.onPrimaryCtaClicked(INITIAL) }
+                        binding.daxDialogCta.primaryCta.animate().alpha(MAX_ALPHA).duration = ANIMATION_DURATION
+                    }
+                    scheduleTypingAnimation(ctaText) { afterAnimation() }
+                }
+
+                COMPARISON_CHART -> {
+                    binding.daxDialogCta.dialogTextCta.text = ""
+                    TransitionManager.beginDelayedTransition(binding.daxDialogCta.cardView, AutoTransition())
+                    binding.daxDialogCta.progressBarText.show()
+                    binding.daxDialogCta.progressBarText.text = "1 / 2"
+                    binding.daxDialogCta.progressBar.show()
+                    binding.daxDialogCta.progressBar.progress = 1
+                    val ctaText = it.getString(R.string.highlightsPreOnboardingDaxDialog2Title)
+                    binding.daxDialogCta.hiddenTextCta.text = ctaText.html(it)
+                    binding.daxDialogCta.primaryCta.alpha = MIN_ALPHA
+                    binding.daxDialogCta.comparisonChart.root.show()
+                    binding.daxDialogCta.comparisonChart.root.alpha = MIN_ALPHA
+
+                    binding.daxDialogCta.comparisonChart.feature3.text = it.getString(R.string.highlightsPreOnboardingComparisonChartItem3)
+                    binding.daxDialogCta.comparisonChart.feature4.text = it.getString(R.string.highlightsPreOnboardingComparisonChartItem4)
+                    binding.daxDialogCta.comparisonChart.feature5.text = it.getString(R.string.highlightsPreOnboardingComparisonChartItem5)
+
+                    afterAnimation = {
+                        binding.daxDialogCta.dialogTextCta.finishAnimation()
+                        binding.daxDialogCta.primaryCta.text = it.getString(R.string.preOnboardingDaxDialog2Button)
+                        binding.daxDialogCta.primaryCta.setOnClickListener { viewModel.onPrimaryCtaClicked(COMPARISON_CHART) }
+                        binding.daxDialogCta.primaryCta.animate().alpha(MAX_ALPHA).duration = ANIMATION_DURATION
+                        binding.daxDialogCta.comparisonChart.root.animate().alpha(MAX_ALPHA).duration = ANIMATION_DURATION
+                    }
+                    scheduleTypingAnimation(ctaText) { afterAnimation() }
+                }
+
+                ADDRESS_BAR_POSITION -> {
+                    binding.daxDialogCta.dialogTextCta.text = ""
+                    binding.daxDialogCta.comparisonChart.root.gone()
+                    TransitionManager.beginDelayedTransition(binding.daxDialogCta.cardView, AutoTransition())
+                    binding.daxDialogCta.progressBarText.show()
+                    binding.daxDialogCta.progressBarText.text = "2 / 2"
+                    binding.daxDialogCta.progressBar.show()
+                    binding.daxDialogCta.progressBar.progress = 2
+                    val ctaText = it.getString(R.string.highlightsPreOnboardingAddressBarTitle)
+                    binding.daxDialogCta.hiddenTextCta.text = ctaText.html(it)
+                    binding.daxDialogCta.primaryCta.alpha = MIN_ALPHA
+                    binding.daxDialogCta.addressBarPosition.root.show()
+                    binding.daxDialogCta.addressBarPosition.root.alpha = MIN_ALPHA
+
+                    afterAnimation = {
+                        binding.daxDialogCta.dialogTextCta.finishAnimation()
+                        setAddressBarPositionOptions(true)
+                        binding.daxDialogCta.primaryCta.text = it.getString(R.string.highlightsPreOnboardingAddressBarOkButton)
+                        binding.daxDialogCta.primaryCta.setOnClickListener { viewModel.onPrimaryCtaClicked(ADDRESS_BAR_POSITION) }
+                        binding.daxDialogCta.primaryCta.animate().alpha(MAX_ALPHA).duration = ANIMATION_DURATION
+                        binding.daxDialogCta.addressBarPosition.option1.setOnClickListener {
+                            viewModel.onAddressBarPositionOptionSelected(true)
+                        }
+                        binding.daxDialogCta.addressBarPosition.option2.setOnClickListener {
+                            viewModel.onAddressBarPositionOptionSelected(false)
+                        }
+                        binding.daxDialogCta.addressBarPosition.root.animate().alpha(MAX_ALPHA).duration = ANIMATION_DURATION
+                    }
+
+                    scheduleTypingAnimation(ctaText) { afterAnimation() }
+                }
+            }
+            binding.sceneBg.setOnClickListener { afterAnimation() }
+            binding.daxDialogCta.cardContainer.setOnClickListener { afterAnimation() }
         }
-        triangle.setImageResource(R.drawable.ic_triangle_bubble_white)
     }
 
     private fun setSkipAnimationListener() {
-        longDescriptionContainer.setOnClickListener {
-            if (dialogTextCta.hasAnimationStarted()) {
+        val dialogAnimationStarted = binding.daxDialogCta.dialogTextCta.hasAnimationStarted()
+        binding.longDescriptionContainer.setOnClickListener {
+            if (dialogAnimationStarted) {
                 finishTypingAnimation()
             } else if (!welcomeAnimationFinished) {
                 welcomeAnimation?.cancel()
+                hikerAnimation?.cancel()
                 scheduleWelcomeAnimation(0L)
             }
             welcomeAnimationFinished = true
@@ -167,37 +274,64 @@ class WelcomePage : OnboardingPageFragment() {
     }
 
     private fun scheduleWelcomeAnimation(startDelay: Long = ANIMATION_DELAY) {
-        welcomeAnimation = ViewCompat.animate(welcomeContent as View)
+        ViewCompat.animate(binding.foregroundImageView)
+            .alpha(MIN_ALPHA)
+            .setDuration(ANIMATION_DURATION).startDelay = startDelay
+        welcomeAnimation = ViewCompat.animate(binding.welcomeContent as View)
             .alpha(MIN_ALPHA)
             .setDuration(ANIMATION_DURATION)
             .setStartDelay(startDelay)
             .withEndAction {
-                typingAnimation = ViewCompat.animate(daxCtaContainer)
-                    .alpha(MAX_ALPHA)
-                    .setDuration(ANIMATION_DURATION)
-                    .withEndAction {
-                        welcomeAnimationFinished = true
-                        dialogTextCta.startTypingAnimation(ctaText)
-                        setPrimaryCtaListenerAfterWelcomeAlphaAnimation()
-                    }
+                viewModel.loadDaxDialog()
+            }
+    }
+
+    private fun scheduleTypingAnimation(ctaText: String, afterAnimation: () -> Unit = {}) {
+        typingAnimation = ViewCompat.animate(binding.daxDialogCta.daxCtaContainer)
+            .alpha(MAX_ALPHA)
+            .setDuration(ANIMATION_DURATION)
+            .withEndAction {
+                welcomeAnimationFinished = true
+                binding.daxDialogCta.dialogTextCta.startTypingAnimation(ctaText, afterAnimation = afterAnimation)
             }
     }
 
     private fun finishTypingAnimation() {
         welcomeAnimation?.cancel()
-        dialogTextCta.finishAnimation()
-        setPrimaryCtaListenerAfterWelcomeAlphaAnimation()
+        hikerAnimation?.cancel()
     }
 
-    private fun setPrimaryCtaListenerAfterWelcomeAlphaAnimation() {
-        primaryCta.setOnClickListener { event(WelcomePageView.Event.OnPrimaryCtaClicked) }
+    private fun showDefaultBrowserDialog(intent: Intent) {
+        startActivityForResult(intent, DEFAULT_BROWSER_ROLE_MANAGER_DIALOG)
+    }
+
+    private fun applyFullScreenFlags() {
+        activity?.window?.apply {
+            addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+            WindowCompat.setDecorFitsSystemWindows(this, false)
+            statusBarColor = Color.TRANSPARENT
+            navigationBarColor = Color.BLACK
+        }
+        ViewCompat.requestApplyInsets(binding.longDescriptionContainer)
+    }
+
+    private fun setBackgroundRes(backgroundRes: Int) {
+        binding.sceneBg.setImageResource(backgroundRes)
     }
 
     companion object {
+
+        enum class PreOnboardingDialogType {
+            INITIAL,
+            COMPARISON_CHART,
+            ADDRESS_BAR_POSITION,
+        }
+
         private const val MIN_ALPHA = 0f
         private const val MAX_ALPHA = 1f
         private const val ANIMATION_DURATION = 400L
         private const val ANIMATION_DELAY = 1400L
+        private const val ANIMATION_DELAY_AFTER_NOTIFICATIONS_PERMISSIONS_HANDLED = 800L
 
         private const val DEFAULT_BROWSER_ROLE_MANAGER_DIALOG = 101
     }

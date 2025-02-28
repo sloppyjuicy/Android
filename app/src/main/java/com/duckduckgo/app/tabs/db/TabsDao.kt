@@ -20,11 +20,14 @@ import androidx.lifecycle.LiveData
 import androidx.room.*
 import com.duckduckgo.app.tabs.model.TabEntity
 import com.duckduckgo.app.tabs.model.TabSelectionEntity
+import com.duckduckgo.common.utils.swap
+import com.duckduckgo.di.scopes.AppScope
+import dagger.SingleInstanceIn
+import java.time.LocalDateTime
 import kotlinx.coroutines.flow.Flow
-import javax.inject.Singleton
 
 @Dao
-@Singleton
+@SingleInstanceIn(AppScope::class)
 abstract class TabsDao {
 
     @Query("select * from tabs where deletable is 0 order by position limit 1")
@@ -35,6 +38,9 @@ abstract class TabsDao {
 
     @Query("select * from tabs inner join tab_selection on tabs.tabId = tab_selection.tabId order by position limit 1")
     abstract fun liveSelectedTab(): LiveData<TabEntity>
+
+    @Query("select * from tabs inner join tab_selection on tabs.tabId = tab_selection.tabId order by position limit 1")
+    abstract fun flowSelectedTab(): Flow<TabEntity?>
 
     @Query("select * from tabs where deletable is 0 order by position")
     abstract fun tabs(): List<TabEntity>
@@ -66,6 +72,9 @@ abstract class TabsDao {
     @Query("delete from tabs where deletable is 1")
     abstract fun deleteTabsMarkedAsDeletable()
 
+    @Query("select tabId from tabs where deletable is 1")
+    abstract fun getDeletableTabIds(): List<String>
+
     @Transaction
     open fun markTabAsDeletable(tab: TabEntity) {
         // requirement: only one tab can be marked as deletable
@@ -92,7 +101,7 @@ abstract class TabsDao {
         if (selectedTab() != null) {
             return
         }
-        firstTab()?.let {
+        lastTab()?.let {
             insertTabSelection(TabSelectionEntity(tabId = it.tabId))
         }
     }
@@ -127,7 +136,10 @@ abstract class TabsDao {
     }
 
     @Transaction
-    open fun deleteTabAndUpdateSelection(tab: TabEntity, newSelectedTab: TabEntity? = null) {
+    open fun deleteTabAndUpdateSelection(
+        tab: TabEntity,
+        newSelectedTab: TabEntity? = null,
+    ) {
         deleteTab(tab)
 
         if (newSelectedTab != null) {
@@ -157,7 +169,27 @@ abstract class TabsDao {
         return tabs().lastOrNull()
     }
 
-    @Query("update tabs set url=:url, title=:title, viewed=:viewed where tabId=:tabId")
-    abstract fun updateUrlAndTitle(tabId: String, url: String?, title: String?, viewed: Boolean)
+    @Query("update tabs set lastAccessTime=:lastAccessTime where tabId=:tabId")
+    abstract fun updateTabLastAccess(
+        tabId: String,
+        lastAccessTime: LocalDateTime,
+    )
 
+    @Query("update tabs set url=:url, title=:title, viewed=:viewed where tabId=:tabId")
+    abstract fun updateUrlAndTitle(
+        tabId: String,
+        url: String?,
+        title: String?,
+        viewed: Boolean,
+    )
+
+    @Transaction
+    open fun updateTabsOrder(from: Int, to: Int) {
+        if (from != to) {
+            val newTabs = tabs().swap(from, to)
+            newTabs.forEachIndexed { index, tabEntity ->
+                updateTab(tabEntity.copy(position = index))
+            }
+        }
+    }
 }

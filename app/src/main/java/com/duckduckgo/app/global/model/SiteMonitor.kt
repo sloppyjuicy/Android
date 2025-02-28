@@ -17,23 +17,43 @@
 package com.duckduckgo.app.global.model
 
 import android.net.Uri
+import android.net.http.SslCertificate
+import androidx.annotation.WorkerThread
 import androidx.core.net.toUri
-import com.duckduckgo.app.global.isHttps
-import com.duckduckgo.app.global.model.Site.SiteGrades
-import com.duckduckgo.app.global.model.SiteFactory.SitePrivacyData
-import com.duckduckgo.app.privacy.model.Grade
+import com.duckduckgo.app.browser.UriString
+import com.duckduckgo.app.browser.certificates.BypassedSSLCertificatesRepository
+import com.duckduckgo.app.global.model.PrivacyShield.MALICIOUS
+import com.duckduckgo.app.global.model.PrivacyShield.PROTECTED
+import com.duckduckgo.app.global.model.PrivacyShield.UNKNOWN
+import com.duckduckgo.app.global.model.PrivacyShield.UNPROTECTED
+import com.duckduckgo.app.privacy.db.UserAllowListRepository
 import com.duckduckgo.app.privacy.model.HttpsStatus
-import com.duckduckgo.app.privacy.model.PrivacyGrade
-import com.duckduckgo.app.privacy.model.PrivacyPractices
 import com.duckduckgo.app.surrogates.SurrogateResponse
 import com.duckduckgo.app.trackerdetection.model.Entity
+import com.duckduckgo.app.trackerdetection.model.TrackerStatus
 import com.duckduckgo.app.trackerdetection.model.TrackingEvent
+import com.duckduckgo.browser.api.brokensite.BrokenSiteContext
+import com.duckduckgo.common.utils.DispatcherProvider
+import com.duckduckgo.common.utils.isHttps
+import com.duckduckgo.duckplayer.api.DuckPlayer
+import com.duckduckgo.privacy.config.api.ContentBlocking
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import timber.log.Timber
 
 class SiteMonitor(
     url: String,
     override var title: String?,
-    override var upgradedHttps: Boolean = false
+    override var upgradedHttps: Boolean = false,
+    externalLaunch: Boolean,
+    private val userAllowListRepository: UserAllowListRepository,
+    private val contentBlocking: ContentBlocking,
+    private val bypassedSSLCertificatesRepository: BypassedSSLCertificatesRepository,
+    appCoroutineScope: CoroutineScope,
+    dispatcherProvider: DispatcherProvider,
+    brokenSiteContext: BrokenSiteContext,
+    private val duckPlayer: DuckPlayer,
 ) : Site {
 
     override var url: String = url
@@ -57,40 +77,63 @@ class SiteMonitor(
 
     override var hasHttpResources = false
 
-    override var privacyPractices: PrivacyPractices.Practices = PrivacyPractices.UNKNOWN
+    override var sslError: Boolean = false
+
+    override var isExternalLaunch = externalLaunch
 
     override var entity: Entity? = null
 
+    override var certificate: SslCertificate? = null
+
     override val trackingEvents = CopyOnWriteArrayList<TrackingEvent>()
+    override val errorCodeEvents = CopyOnWriteArrayList<String>()
+    override val httpErrorCodeEvents = CopyOnWriteArrayList<Int>()
 
     override val surrogates = CopyOnWriteArrayList<SurrogateResponse>()
 
     override val trackerCount: Int
-        get() = trackingEvents.size
+        get() = trackingEvents.count { it.status == TrackerStatus.BLOCKED }
+
+    override val otherDomainsLoadedCount: Int
+        get() = trackingEvents.asSequence()
+            .filter { it.status == TrackerStatus.ALLOWED }
+            .map { UriString.host(it.trackerUrl) }
+            .distinct()
+            .count()
+
+    override val specialDomainsLoadedCount: Int
+        get() = trackingEvents.asSequence()
+            .filter { specialDomainTypes.contains(it.status) }
+            .map { UriString.host(it.trackerUrl) }
+            .distinct()
+            .count()
 
     override val majorNetworkCount: Int
         get() = trackingEvents.distinctBy { it.entity?.name }.count { it.entity?.isMajor ?: false }
 
     override val allTrackersBlocked: Boolean
-        get() = trackingEvents.none { !it.blocked }
+        get() = trackingEvents.none { it.status == TrackerStatus.USER_ALLOWED }
 
-    private val gradeCalculator: Grade
+    private var fullSiteDetailsAvailable: Boolean = false
+
+    private val isHttps = https != HttpsStatus.NONE
+
+    override var userAllowList: Boolean = false
 
     init {
-        val isHttps = https != HttpsStatus.NONE
-
         // httpsAutoUpgrade is not supported yet; for now, keep it equal to isHttps and don't penalise sites
-        gradeCalculator = Grade(https = isHttps, httpsAutoUpgrade = isHttps)
+        appCoroutineScope.launch(dispatcherProvider.io()) {
+            domain?.let { userAllowList = isAllowListed(it) }
+        }
     }
 
     override fun updatePrivacyData(sitePrivacyData: SitePrivacyData) {
-        this.privacyPractices = sitePrivacyData.practices
         this.entity = sitePrivacyData.entity
-        gradeCalculator.updateData(privacyPractices.score, entity)
+        Timber.i("fullSiteDetailsAvailable entity ${sitePrivacyData.entity} for $domain")
+        fullSiteDetailsAvailable = true
     }
 
     private fun httpsStatus(): HttpsStatus {
-
         val uri = uri ?: return HttpsStatus.NONE
 
         if (uri.isHttps) {
@@ -100,52 +143,87 @@ class SiteMonitor(
         return HttpsStatus.NONE
     }
 
+    override fun resetErrors() {
+        errorCodeEvents.clear()
+        httpErrorCodeEvents.clear()
+    }
+
     override fun surrogateDetected(surrogate: SurrogateResponse) {
         surrogates.add(surrogate)
     }
 
     override fun trackerDetected(event: TrackingEvent) {
         trackingEvents.add(event)
-
-        val entity = event.entity ?: return
-        if (event.blocked) {
-            gradeCalculator.addEntityBlocked(entity)
-        } else {
-            gradeCalculator.addEntityNotBlocked(entity)
-        }
     }
 
-    override fun calculateGrades(): SiteGrades {
-        val scores = gradeCalculator.calculateScore()
-        val privacyGradeOriginal = privacyGrade(scores)
-        val privacyGradeImproved = privacyGradeImproved(scores)
-        return SiteGrades(privacyGradeOriginal, privacyGradeImproved)
+    override fun onErrorDetected(error: String) {
+        errorCodeEvents.add(error)
     }
 
-    private fun privacyGrade(scores: Grade.Scores): PrivacyGrade {
-        return when (scores) {
-            Grade.Scores.ScoresUnavailable -> PrivacyGrade.UNKNOWN
-            is Grade.Scores.ScoresAvailable -> privacyGrade(scores.site.grade)
-        }
+    override fun onHttpErrorDetected(errorCode: Int) {
+        httpErrorCodeEvents.add(errorCode)
     }
 
-    private fun privacyGradeImproved(scores: Grade.Scores): PrivacyGrade {
-        return when (scores) {
-            Grade.Scores.ScoresUnavailable -> PrivacyGrade.UNKNOWN
-            is Grade.Scores.ScoresAvailable -> privacyGrade(scores.enhanced.grade)
+    override fun privacyProtection(): PrivacyShield {
+        userAllowList = domain?.let { isAllowListed(it) } ?: false
+        if (duckPlayer.isDuckPlayerUri(url)) return UNKNOWN
+        if (userAllowList || !isHttps) return UNPROTECTED
+        if (maliciousSiteStatus != null) return MALICIOUS
+
+        if (!fullSiteDetailsAvailable) {
+            Timber.i("Shield: not fullSiteDetailsAvailable for $domain")
+            Timber.i("Shield: entity is ${entity?.name} for $domain")
+            return UNKNOWN
         }
+
+        sslError = isSslCertificateBypassed(url)
+        if (sslError) {
+            Timber.i("Shield: site has certificate error")
+            return UNPROTECTED
+        }
+
+        Timber.i("Shield: isMajor ${entity?.isMajor} prev ${entity?.prevalence} for $domain")
+        return PROTECTED
     }
 
-    private fun privacyGrade(grade: Grade.Grading): PrivacyGrade {
-        return when (grade) {
-            Grade.Grading.A -> PrivacyGrade.A
-            Grade.Grading.B_PLUS -> PrivacyGrade.B_PLUS
-            Grade.Grading.B -> PrivacyGrade.B
-            Grade.Grading.C_PLUS -> PrivacyGrade.C_PLUS
-            Grade.Grading.C -> PrivacyGrade.C
-            Grade.Grading.D -> PrivacyGrade.D
-            Grade.Grading.D_MINUS -> PrivacyGrade.D
-            Grade.Grading.UNKNOWN -> PrivacyGrade.UNKNOWN
-        }
+    @WorkerThread
+    private fun isAllowListed(domain: String): Boolean {
+        return userAllowListRepository.isDomainInUserAllowList(domain) || contentBlocking.isAnException(domain)
+    }
+
+    private fun isSslCertificateBypassed(domain: String): Boolean {
+        return bypassedSSLCertificatesRepository.contains(domain)
+    }
+
+    override var urlParametersRemoved: Boolean = false
+
+    override var consentManaged: Boolean = false
+
+    override var consentOptOutFailed: Boolean = false
+
+    override var consentSelfTestFailed: Boolean = false
+
+    override var consentCosmeticHide: Boolean? = false
+
+    override var isDesktopMode: Boolean = false
+
+    override var nextUrl: String = url
+
+    override val realBrokenSiteContext: BrokenSiteContext = brokenSiteContext
+
+    override var maliciousSiteStatus: MaliciousSiteStatus? = null
+
+    companion object {
+        private val specialDomainTypes = setOf(
+            TrackerStatus.AD_ALLOWED,
+            TrackerStatus.SITE_BREAKAGE_ALLOWED,
+            TrackerStatus.SAME_ENTITY_ALLOWED,
+            TrackerStatus.USER_ALLOWED,
+        )
+
+        private val allowedDomainTypes = setOf(
+            TrackerStatus.USER_ALLOWED,
+            TrackerStatus.SAME_ENTITY_ALLOWED,
+        )
     }
 }

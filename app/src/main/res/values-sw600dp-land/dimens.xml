@@ -1,7 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
-
-<!--
-  ~ Copyright (c) 2018 DuckDuckGo
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright (c) 2024 DuckDuckGo
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -17,7 +15,5 @@
   -->
 
 <resources>
-
-    <dimen name="feedbackCardHorizontalMargin">96dp</dimen>
-    <dimen name="homeTabDdgLogoTopMargin">100dp</dimen>
+    <dimen name="sslWarningTextWidth">628dp</dimen>
 </resources>

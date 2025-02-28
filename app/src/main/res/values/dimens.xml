@@ -1,7 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
-
-<!--
-  ~ Copyright (c) 2018 DuckDuckGo
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright (c) 2024 DuckDuckGo
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -17,24 +15,6 @@
   -->
 
 <resources>
-    <dimen name="modalCardTitleTextSize">20sp</dimen>
-    <dimen name="modalCardDescriptionTextSize">14sp</dimen>
-    <dimen name="modalCardEditTextSize">14sp</dimen>
-    <dimen name="modalCardHeaderElevation">4dp</dimen>
-    <dimen name="modalCardMajorButtonTextSize">15sp</dimen>
-
-    <dimen name="feedbackCardVerticalMargin">16dp</dimen>
-    <dimen name="feedbackFormFieldsMargin">16dp</dimen>
-    <dimen name="feedbackCardHorizontalMargin">16dp</dimen>
-    <dimen name="feedbackTitleMarginTop">30dp</dimen>
-
-    <dimen name="settingsItemHorizontalPadding">20dp</dimen>
-
-    <dimen name="systemSearchResultsElevation">4dp</dimen>
-
-    <dimen name="changeAppIconPadding">16dp</dimen>
-    <dimen name="changeAppIconListPadding">4dp</dimen>
-    <dimen name="changeAppIconSize">75dp</dimen>
-    <dimen name="homeTabDdgLogoTopMargin">100dp</dimen>
-
+    <dimen name="sslWarningTextWidth">0dp</dimen>
+    <dimen name="browserPopupMenuWidth">280dp</dimen>
 </resources>

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 DuckDuckGo
+ * Copyright (c) 2022 DuckDuckGo
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,114 +16,150 @@
 
 package com.duckduckgo.app.email
 
+import android.annotation.SuppressLint
 import android.webkit.WebView
 import androidx.test.annotation.UiThreadTest
+import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
-import com.duckduckgo.app.browser.DuckDuckGoUrlDetector
+import com.duckduckgo.app.autofill.DefaultEmailProtectionJavascriptInjector
+import com.duckduckgo.app.autofill.EmailProtectionJavascriptInjector
+import com.duckduckgo.app.browser.DuckDuckGoUrlDetectorImpl
 import com.duckduckgo.app.browser.R
-import com.nhaarman.mockitokotlin2.*
+import com.duckduckgo.autofill.api.Autofill
+import com.duckduckgo.autofill.api.AutofillFeature
+import com.duckduckgo.autofill.api.email.EmailManager
+import com.duckduckgo.common.utils.DispatcherProvider
+import com.duckduckgo.feature.toggles.api.FakeFeatureToggleFactory
+import com.duckduckgo.feature.toggles.api.Toggle
+import java.io.BufferedReader
 import org.junit.Before
 import org.junit.Test
-import java.io.BufferedReader
+import org.mockito.kotlin.*
 
 class EmailInjectorJsTest {
 
     private val mockEmailManager: EmailManager = mock()
+    private val mockDispatcherProvider: DispatcherProvider = mock()
+    private val autofillFeature = FakeFeatureToggleFactory.create(AutofillFeature::class.java)
+    private val mockAutofill: Autofill = mock()
+    private val javascriptInjector: EmailProtectionJavascriptInjector = DefaultEmailProtectionJavascriptInjector()
+
     lateinit var testee: EmailInjectorJs
 
     @Before
     fun setup() {
-        testee = EmailInjectorJs(mockEmailManager, DuckDuckGoUrlDetector())
+        testee =
+            EmailInjectorJs(
+                mockEmailManager,
+                DuckDuckGoUrlDetectorImpl(),
+                mockDispatcherProvider,
+                autofillFeature,
+                javascriptInjector,
+                mockAutofill,
+            )
+        whenever(mockAutofill.isAnException(any())).thenReturn(false)
     }
 
+    @SuppressLint("DenyListedApi")
     @UiThreadTest
     @Test
-    fun whenInjectEmailAutofillJsAndUrlIsFromDuckDuckGoDomainThenInjectJsCode() {
-        val jsToEvaluate = getJsToEvaluate()
+    @SdkSuppress(minSdkVersion = 24)
+    fun whenInjectAddressThenInjectJsCodeReplacingTheAlias() {
+        val address = "address"
+        val jsToEvaluate = getAliasJsToEvaluate().replace("%s", address)
         val webView = spy(WebView(InstrumentationRegistry.getInstrumentation().targetContext))
+        autofillFeature.self().setRawStoredState(Toggle.State(enable = true))
 
-        testee.injectEmailAutofillJs(webView, "https://duckduckgo.com")
+        testee.injectAddressInEmailField(webView, address, "https://example.com")
 
         verify(webView).evaluateJavascript(jsToEvaluate, null)
     }
 
+    @SuppressLint("DenyListedApi")
     @UiThreadTest
     @Test
-    fun whenInjectEmailAutofillJsAndUrlIsFromDuckDuckGoSubdomainThenInjectJsCode() {
-        val jsToEvaluate = getJsToEvaluate()
+    @SdkSuppress(minSdkVersion = 24)
+    fun whenInjectAddressAndFeatureIsDisabledThenJsCodeNotInjected() {
+        autofillFeature.self().setRawStoredState(Toggle.State(enable = true))
+
+        val address = "address"
         val webView = spy(WebView(InstrumentationRegistry.getInstrumentation().targetContext))
 
-        testee.injectEmailAutofillJs(webView, "https://test.duckduckgo.com")
+        testee.injectAddressInEmailField(webView, address, "https://example.com")
 
-        verify(webView).evaluateJavascript(jsToEvaluate, null)
+        verify(webView, never()).evaluateJavascript(any(), any())
     }
 
     @UiThreadTest
     @Test
-    fun whenInjectEmailAutofillJsAndUrlIsNotFromDuckDuckGoAndEmailIsSignedInThenInjectJsCode() {
+    @SdkSuppress(minSdkVersion = 24)
+    fun whenInjectAddressAndUrlIsAnExceptionThenJsCodeNotInjected() {
+        whenever(mockAutofill.isAnException(any())).thenReturn(true)
+
+        val address = "address"
+        val webView = spy(WebView(InstrumentationRegistry.getInstrumentation().targetContext))
+
+        testee.injectAddressInEmailField(webView, address, "https://example.com")
+
+        verify(webView, never()).evaluateJavascript(any(), any())
+    }
+
+    @UiThreadTest
+    @Test
+    @SdkSuppress(minSdkVersion = 24)
+    fun whenNotifyWebAppSignEventAndUrlIsNotFromDuckDuckGoAndEmailIsSignedInThenDoNotEvaluateJsCode() {
         whenever(mockEmailManager.isSignedIn()).thenReturn(true)
-        val jsToEvaluate = getJsToEvaluate()
+        val jsToEvaluate = getNotifySignOutJsToEvaluate()
         val webView = spy(WebView(InstrumentationRegistry.getInstrumentation().targetContext))
 
-        testee.injectEmailAutofillJs(webView, "https://example.com")
-
-        verify(webView).evaluateJavascript(jsToEvaluate, null)
-    }
-
-    @UiThreadTest
-    @Test
-    fun whenInjectEmailAutofillJsAndUrlIsNotFromDuckDuckGoAndEmailIsNotSignedInThenDoNotInjectJsCode() {
-        whenever(mockEmailManager.isSignedIn()).thenReturn(false)
-        val jsToEvaluate = getJsToEvaluate()
-        val webView = spy(WebView(InstrumentationRegistry.getInstrumentation().targetContext))
-
-        testee.injectEmailAutofillJs(webView, "https://example.com")
+        testee.notifyWebAppSignEvent(webView, "https://example.com")
 
         verify(webView, never()).evaluateJavascript(jsToEvaluate, null)
     }
 
     @UiThreadTest
     @Test
-    fun whenInjectEmailAutofillJsTwiceThenDoNotInjectJsCodeTwice() {
-        whenever(mockEmailManager.isSignedIn()).thenReturn(true)
-        val jsToEvaluate = getJsToEvaluate()
+    @SdkSuppress(minSdkVersion = 24)
+    fun whenNotifyWebAppSignEventAndUrlIsNotFromDuckDuckGoAndEmailIsNotSignedInThenDoNotEvaluateJsCode() {
+        whenever(mockEmailManager.isSignedIn()).thenReturn(false)
+        val jsToEvaluate = getNotifySignOutJsToEvaluate()
         val webView = spy(WebView(InstrumentationRegistry.getInstrumentation().targetContext))
 
-        testee.injectEmailAutofillJs(webView, "https://example.com")
-        testee.injectEmailAutofillJs(webView, "https://example.com")
+        testee.notifyWebAppSignEvent(webView, "https://example.com")
 
-        verify(webView, times(1)).evaluateJavascript(jsToEvaluate, null)
+        verify(webView, never()).evaluateJavascript(jsToEvaluate, null)
     }
 
+    @SuppressLint("DenyListedApi")
     @UiThreadTest
     @Test
-    fun whenResetInjectedFlagCalledBetweenTwoInjectEmailJsCallsThenInjectJsCodeTwice() {
-        whenever(mockEmailManager.isSignedIn()).thenReturn(true)
-        val jsToEvaluate = getJsToEvaluate()
+    @SdkSuppress(minSdkVersion = 24)
+    fun whenNotifyWebAppSignEventAndUrlIsFromDuckDuckGoAndFeatureIsDisabledAndEmailIsNotSignedInThenDoNotEvaluateJsCode() {
+        whenever(mockEmailManager.isSignedIn()).thenReturn(false)
+        autofillFeature.self().setRawStoredState(Toggle.State(enable = false))
+
+        val jsToEvaluate = getNotifySignOutJsToEvaluate()
         val webView = spy(WebView(InstrumentationRegistry.getInstrumentation().targetContext))
 
-        testee.injectEmailAutofillJs(webView, "https://example.com")
-        testee.resetInjectedJsFlag()
-        testee.injectEmailAutofillJs(webView, "https://example.com")
+        testee.notifyWebAppSignEvent(webView, "https://duckduckgo.com/email")
 
-        verify(webView, times(2)).evaluateJavascript(jsToEvaluate, null)
+        verify(webView, never()).evaluateJavascript(jsToEvaluate, null)
     }
 
+    @SuppressLint("DenyListedApi")
     @UiThreadTest
     @Test
-    fun whenInjectAddressThenInjectJsCodeReplacingTheAlias() {
-        val address = "address"
-        val jsToEvaluate = getAliasJsToEvaluate().replace("%s", address)
+    @SdkSuppress(minSdkVersion = 24)
+    fun whenNotifyWebAppSignEventAndUrlIsFromDuckDuckGoAndFeatureIsEnabledAndEmailIsNotSignedInThenEvaluateJsCode() {
+        whenever(mockEmailManager.isSignedIn()).thenReturn(false)
+        autofillFeature.self().setRawStoredState(Toggle.State(enable = true))
+
+        val jsToEvaluate = getNotifySignOutJsToEvaluate()
         val webView = spy(WebView(InstrumentationRegistry.getInstrumentation().targetContext))
 
-        testee.injectAddressInEmailField(webView, address)
+        testee.notifyWebAppSignEvent(webView, "https://duckduckgo.com/email")
 
         verify(webView).evaluateJavascript(jsToEvaluate, null)
-    }
-
-    private fun getJsToEvaluate(): String {
-        val js = readResource().use { it?.readText() }.orEmpty()
-        return "javascript:$js"
     }
 
     private fun getAliasJsToEvaluate(): String {
@@ -133,7 +169,15 @@ class EmailInjectorJsTest {
         return "javascript:$js"
     }
 
-    private fun readResource(): BufferedReader? {
-        return javaClass.classLoader?.getResource("autofill.js")?.openStream()?.bufferedReader()
+    private fun getNotifySignOutJsToEvaluate(): String {
+        val js =
+            InstrumentationRegistry.getInstrumentation().targetContext.resources.openRawResource(R.raw.signout_autofill)
+                .bufferedReader()
+                .use { it.readText() }
+        return "javascript:$js"
+    }
+
+    private fun readResource(resourceName: String): BufferedReader? {
+        return javaClass.classLoader?.getResource(resourceName)?.openStream()?.bufferedReader()
     }
 }

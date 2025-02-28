@@ -16,27 +16,39 @@
 
 package com.duckduckgo.app.globalprivacycontrol.ui
 
+import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
-import android.widget.CompoundButton.OnCheckedChangeListener
 import android.os.Bundle
-import android.text.*
+import android.text.SpannableStringBuilder
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
 import android.text.style.URLSpan
 import android.view.View
-import androidx.lifecycle.Observer
-import com.duckduckgo.app.browser.BrowserActivity
+import android.widget.CompoundButton.OnCheckedChangeListener
+import com.duckduckgo.anvil.annotations.InjectWith
 import com.duckduckgo.app.browser.R
-import com.duckduckgo.app.global.DuckDuckGoActivity
-import com.duckduckgo.app.global.view.html
-import com.duckduckgo.app.global.view.quietlySetIsChecked
-import kotlinx.android.synthetic.main.content_global_privacy_control.*
-import kotlinx.android.synthetic.main.include_toolbar.*
+import com.duckduckgo.app.browser.databinding.ActivityGlobalPrivacyControlBinding
+import com.duckduckgo.browser.api.ui.BrowserScreens.WebViewActivityWithParams
+import com.duckduckgo.common.ui.DuckDuckGoActivity
+import com.duckduckgo.common.ui.viewbinding.viewBinding
+import com.duckduckgo.common.utils.extensions.html
+import com.duckduckgo.di.scopes.ActivityScope
+import com.duckduckgo.navigation.api.GlobalActivityStarter
+import javax.inject.Inject
 
+@InjectWith(ActivityScope::class)
 class GlobalPrivacyControlActivity : DuckDuckGoActivity() {
 
+    @Inject
+    lateinit var globalActivityStarter: GlobalActivityStarter
+
+    private val binding: ActivityGlobalPrivacyControlBinding by viewBinding()
+
     private val viewModel: GlobalPrivacyControlViewModel by bindViewModel()
+
+    private val toolbar
+        get() = binding.includeToolbar.toolbar
 
     private val clickableSpan = object : ClickableSpan() {
         override fun onClick(widget: View) {
@@ -50,7 +62,7 @@ class GlobalPrivacyControlActivity : DuckDuckGoActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_global_privacy_control)
+        setContentView(binding.root)
         setupToolbar(toolbar)
         configureUiEventHandlers()
         configureClickableLink()
@@ -67,46 +79,48 @@ class GlobalPrivacyControlActivity : DuckDuckGoActivity() {
                     clickableSpan,
                     gpcSpannableString.getSpanStart(it),
                     gpcSpannableString.getSpanEnd(it),
-                    gpcSpannableString.getSpanFlags(it)
+                    gpcSpannableString.getSpanFlags(it),
                 )
                 removeSpan(it)
+                trim()
             }
         }
-        globalPrivacyControlDescription.apply {
+        binding.globalPrivacyControlDescription.apply {
             text = gpcSpannableString
             movementMethod = LinkMovementMethod.getInstance()
         }
     }
 
     private fun configureUiEventHandlers() {
-        globalPrivacyControlToggle.setOnCheckedChangeListener(globalPrivacyControlToggleListener)
+        binding.globalPrivacyControlToggle.setOnCheckedChangeListener(globalPrivacyControlToggleListener)
     }
 
     private fun observeViewModel() {
         viewModel.viewState.observe(
             this,
-            Observer { viewState ->
+            { viewState ->
                 viewState?.let {
-                    globalPrivacyControlToggle.quietlySetIsChecked(it.globalPrivacyControlEnabled, globalPrivacyControlToggleListener)
+                    binding.globalPrivacyControlToggle.quietlySetIsChecked(it.globalPrivacyControlEnabled, globalPrivacyControlToggleListener)
+                    binding.globalPrivacyControlToggle.isEnabled = it.globalPrivacyControlFeatureEnabled
                 }
-            }
+            },
         )
 
         viewModel.command.observe(
             this,
-            Observer { command ->
+            { command ->
                 command?.let {
                     when (it) {
-                        is GlobalPrivacyControlViewModel.Command.OpenLearnMore -> openLearnMoreSite(it.url)
+                        is GlobalPrivacyControlViewModel.Command.OpenLearnMore -> openLearnMoreSite(it)
                     }
                 }
-            }
+            },
         )
     }
 
-    private fun openLearnMoreSite(url: String) {
-        startActivity(BrowserActivity.intent(this, url))
-        finish()
+    private fun openLearnMoreSite(command: GlobalPrivacyControlViewModel.Command.OpenLearnMore) {
+        val options = ActivityOptions.makeSceneTransitionAnimation(this).toBundle()
+        globalActivityStarter.start(this, WebViewActivityWithParams(command.url, getString(command.titleId)), options)
     }
 
     companion object {
